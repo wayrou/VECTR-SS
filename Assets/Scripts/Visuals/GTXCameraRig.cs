@@ -15,8 +15,14 @@ namespace GTX.Visuals
         [SerializeField] private float baseFov = 67f;
         [SerializeField] private float speedFovKick = 20f;
         [SerializeField] private float flowFovKick = 8f;
+        [SerializeField] private float orbitYawSpeed = 92f;
+        [SerializeField] private float orbitPitchSpeed = 54f;
+        [SerializeField] private float orbitPitchMin = -18f;
+        [SerializeField] private float orbitPitchMax = 24f;
 
         private Camera cameraComponent;
+        private float manualYaw;
+        private float manualPitch;
 
         public void Configure(Transform newTarget, Rigidbody newTargetBody, FlowState newFlowState)
         {
@@ -39,7 +45,11 @@ namespace GTX.Visuals
 
             float speed01 = targetBody != null ? Mathf.InverseLerp(0f, 44f, targetBody.velocity.magnitude) : 0f;
             float flow01 = flowState != null ? flowState.Normalized : 0f;
-            Vector3 desiredPosition = target.TransformPoint(followOffset + Vector3.back * speed01 * 3.4f + Vector3.up * speed01 * 0.35f);
+            UpdateManualOrbit();
+
+            Vector3 dynamicOffset = followOffset + Vector3.back * speed01 * 3.4f + Vector3.up * speed01 * 0.35f;
+            Quaternion orbit = Quaternion.Euler(manualPitch, manualYaw, 0f);
+            Vector3 desiredPosition = target.position + target.TransformDirection(orbit * dynamicOffset);
             transform.position = Vector3.Lerp(transform.position, desiredPosition, 1f - Mathf.Exp(-followSharpness * Time.deltaTime));
 
             Vector3 lookPoint = target.position + target.forward * (lookAhead + speed01 * 8f) + Vector3.up * Mathf.Lerp(1.0f, 0.72f, speed01);
@@ -49,6 +59,34 @@ namespace GTX.Visuals
             {
                 cameraComponent.fieldOfView = Mathf.Lerp(cameraComponent.fieldOfView, baseFov + speed01 * speedFovKick + flow01 * flowFovKick, 1f - Mathf.Exp(-6f * Time.deltaTime));
             }
+        }
+
+        private void UpdateManualOrbit()
+        {
+            float yawInput = 0f;
+            if (Input.GetKey(KeyCode.LeftArrow))
+            {
+                yawInput -= 1f;
+            }
+
+            if (Input.GetKey(KeyCode.RightArrow))
+            {
+                yawInput += 1f;
+            }
+
+            float pitchInput = 0f;
+            if (Input.GetKey(KeyCode.UpArrow))
+            {
+                pitchInput += 1f;
+            }
+
+            if (Input.GetKey(KeyCode.DownArrow))
+            {
+                pitchInput -= 1f;
+            }
+
+            manualYaw = Mathf.Repeat(manualYaw + yawInput * orbitYawSpeed * Time.deltaTime + 180f, 360f) - 180f;
+            manualPitch = Mathf.Clamp(manualPitch + pitchInput * orbitPitchSpeed * Time.deltaTime, orbitPitchMin, orbitPitchMax);
         }
     }
 }

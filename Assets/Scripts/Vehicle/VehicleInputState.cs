@@ -17,12 +17,12 @@ namespace GTX.Vehicle
         public static VehicleInputState FromUnityInput()
         {
             float steerAxis = 0f;
-            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+            if (Input.GetKey(KeyCode.A))
             {
                 steerAxis -= 1f;
             }
 
-            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+            if (Input.GetKey(KeyCode.D))
             {
                 steerAxis += 1f;
             }
@@ -30,8 +30,8 @@ namespace GTX.Vehicle
             VehicleInputState input = new VehicleInputState
             {
                 steer = steerAxis,
-                throttle = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ? 1f : 0f,
-                brake = Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ? 1f : 0f,
+                throttle = Input.GetKey(KeyCode.W) ? 1f : 0f,
+                brake = Input.GetKey(KeyCode.S) ? 1f : 0f,
                 clutch = Input.GetKey(KeyCode.LeftShift) ? 1f : 0f,
                 handbrake = Input.GetKey(KeyCode.Space),
                 boost = Input.GetKey(KeyCode.F),
