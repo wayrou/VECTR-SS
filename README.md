@@ -24,6 +24,8 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - Hidden Flow remains visual-first: speed lines, boost trail changes, skid ink, impact bursts, camera FOV, and outline pulse.
 - Metal, Plastic, and Rubber resource inventory.
 - Race rewards with completion, style/combat, and map bonus payouts.
+- Lightweight one-lap checkpoint objective with visible checkpoint gates and automatic finish through the start gate.
+- Simple route-following AI rival that drives the selected map while remaining a combat target.
 - Garage tuning sliders and upgrade purchases saved through PlayerPrefs.
 - Procedural low-poly mesh kit for track ribbons, chamfered boxes, wedges, prisms, rounded rails, and bike/car visuals.
 - Additive UGUI menu prototype in `Assets/Scripts/UI/VectorSSMenuUI.cs` for later replacement of the current immediate-mode menu.
@@ -95,13 +97,13 @@ Resources, purchased upgrades, selected map, selected vehicle, and tuning values
 4. Press Play.
 5. Use the Vector SS menu to select a map and vehicle, then start a race.
 
-The scene is intentionally mostly empty. Runtime scripts build the menus, track, selected vehicle, camera, HUD, dummy rival, materials, combat systems, rewards, and effects.
+The scene is intentionally mostly empty. Runtime scripts build the menus, track, selected vehicle, camera, HUD, AI rival, materials, combat systems, rewards, and effects.
 
 ## Project Structure
 
 - `Assets/Scripts/Core/` - runtime bootstrap, race/session flow, driving-to-Flow bridge, tuning applier, architecture notes.
 - `Assets/Scripts/Progression/` - Vector SS vehicles, maps, resources, upgrades, rewards, and save/load helpers.
-- `Assets/Scripts/Vehicle/` - vehicle controller, engine, gearbox, clutch/drift, boost, input state.
+- `Assets/Scripts/Vehicle/` - vehicle controller, engine, gearbox, clutch/drift, boost, input state, simple route rival AI.
 - `Assets/Scripts/Combat/` - side slam, boost ram, combat target interface, dummy rival target.
 - `Assets/Scripts/Flow/` - hidden Flow value, tiers, award helper.
 - `Assets/Scripts/Visuals/` - runtime effects, bike lean visual, Flow visual controller, camera rig, low-poly mesh helpers.
@@ -116,8 +118,8 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 
 - Many internal identifiers still say GTX. The player-facing direction is Vector SS.
 - The current primary menu is immediate-mode GUI for speed of integration; the additive `VectorSSMenuUI` script is ready for a later UGUI swap.
-- Race completion uses a lightweight route-progress check plus a `Finish Test Race` button, not a full checkpoint/lap system.
-- The rival is still a dummy target, not a racing AI.
+- Race completion now uses a lightweight checkpoint/lap state machine, but it still uses nearest-route projection rather than physical trigger volumes.
+- The AI rival is intentionally simple route-following physics, not a full opponent brain.
 - Razor uses four hidden WheelColliders for stability while rendering as a two-wheel bike; it is bike-like, not a true motorcycle sim.
 - Unity still shows a disabled built-in AudioListener package warning locally; it is pre-existing and not a gameplay blocker.
 - Audio hooks are still placeholders; no final engine/boost/impact audio mix is wired.
@@ -126,8 +128,8 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 ## 0.2.0 Next Steps
 
 - Replace the immediate-mode menus with the UGUI `VectorSSMenuUI` flow.
-- Add checkpoint/lap timing and clearer completion goals.
-- Add a simple AI rival that can drive all three maps.
+- Replace nearest-route checkpoint logic with physical trigger volumes and timing splits.
+- Add richer AI rival behavior: attacks, recovery, rubber-banding options, and difficulty presets.
 - Add wheel visual spin/suspension sync.
 - Expand Razor-specific moves: Boost Pierce, Snap Lean, and stronger near-miss effects.
 - Add original hand-drawn PNG icons, decals, map cards, upgrade icons, and comic burst sprites.

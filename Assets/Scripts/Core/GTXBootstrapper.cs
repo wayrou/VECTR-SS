@@ -39,9 +39,14 @@ namespace GTX.Core
         private Transform sessionRoot;
         private RuntimeTrackRoute activeRoute;
         private PlayerRig activePlayer;
+        private SimpleRouteRivalAI activeRivalAi;
         private bool hasActivePlayer;
         private float raceStartTime;
         private float bestRouteDistance;
+        private float currentRouteDistance;
+        private int currentLap;
+        private int targetLaps = 1;
+        private int nextCheckpointIndex;
         private float nextRazorNearMissTime;
         private int combatScore;
         private Vector2 garageScroll;
@@ -54,7 +59,7 @@ namespace GTX.Core
         private GUIStyle scrollStyle;
         private Texture2D panelTexture;
         private bool startRaceQueued;
-        private bool completeRaceQueued;
+        private static readonly float[] CheckpointFractions = { 0.25f, 0.5f, 0.75f };
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -236,7 +241,7 @@ namespace GTX.Core
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label(map.displayName, headerStyle);
                 GUILayout.Label(map.theme, bodyStyle);
-                GUILayout.Label("Reward bias: +" + map.mapBonus, bodyStyle);
+                GUILayout.Label("Laps: " + map.lapCount + "   Reward bias: +" + map.mapBonus, bodyStyle);
                 if (GUILayout.Button(playerProfile.selectedMap == map.id ? "Selected" : "Select " + map.displayName, buttonStyle, GUILayout.Height(34f)))
                 {
                     playerProfile.selectedMap = map.id;
@@ -371,27 +376,32 @@ namespace GTX.Core
 
         private void DrawRaceOverlay()
         {
-            Rect top = new Rect(Screen.width - 300f, 24f, 260f, 92f);
+            Rect top = new Rect(Screen.width - 340f, 24f, 300f, 148f);
             GUI.Box(top, string.Empty);
             GUILayout.BeginArea(new Rect(top.x + 14f, top.y + 10f, top.width - 28f, top.height - 18f));
             GUILayout.Label(selectedMap.displayName, headerStyle);
-            GUILayout.Label(selectedVehicle.displayName + "   Lap " + Mathf.RoundToInt(RaceProgress01() * 100f) + "%", bodyStyle);
-            GUILayout.EndArea();
-
-            if (GUI.Button(new Rect(Screen.width - 190f, 126f, 150f, 32f), "Finish Test Race"))
+            GUILayout.Label(selectedVehicle.displayName + "   Lap " + Mathf.Clamp(currentLap + 1, 1, targetLaps) + "/" + targetLaps, bodyStyle);
+            GUILayout.Label("Progress " + Mathf.RoundToInt(RaceProgress01() * 100f) + "%   " + CheckpointStatusText(), bodyStyle);
+            if (activeRivalAi != null)
             {
-                completeRaceQueued = true;
+                GUILayout.Label("Rival " + Mathf.RoundToInt(activeRivalAi.Progress01 * 100f) + "%   Lap " + Mathf.Clamp(activeRivalAi.LapCount + 1, 1, targetLaps) + "/" + targetLaps, bodyStyle);
             }
+            GUILayout.Label("Return through START after CP3.", bodyStyle);
+            GUILayout.EndArea();
+        }
+
+        private string CheckpointStatusText()
+        {
+            if (nextCheckpointIndex < CheckpointFractions.Length)
+            {
+                return "CP" + (nextCheckpointIndex + 1) + "/" + CheckpointFractions.Length;
+            }
+
+            return "FINISH";
         }
 
         private void ProcessQueuedGuiActions()
         {
-            if (completeRaceQueued)
-            {
-                completeRaceQueued = false;
-                CompleteRace();
-            }
-
             if (startRaceQueued)
             {
                 startRaceQueued = false;
@@ -454,9 +464,16 @@ namespace GTX.Core
 
             activePlayer = CreatePlayerMachine(resetPoint, selectedVehicle);
             activePlayer.root.transform.SetParent(sessionRoot, true);
-            TrackPose rivalPose = activeRoute.PoseAtDistance(selectedMap.id == VectorSSMapId.ScraplineYard ? 230f : 255f);
-            GameObject rival = CreateDummyRival(rivalPose.position + rivalPose.right * 7.5f + Vector3.up * 0.02f, rivalPose.rotation);
+            float rivalStartDistance = Mathf.Min(activeRoute.TotalLength * 0.16f, 76f);
+            TrackPose rivalPose = activeRoute.PoseAtDistance(rivalStartDistance);
+            GameObject rival = CreateDummyRival(rivalPose.position + rivalPose.right * 1.8f + Vector3.up * 0.02f, rivalPose.rotation);
             rival.transform.SetParent(sessionRoot, true);
+            activeRivalAi = rival.GetComponent<SimpleRouteRivalAI>();
+            if (activeRivalAi != null)
+            {
+                float cruiseSpeed = selectedMap.id == VectorSSMapId.ScraplineYard ? 31f : selectedMap.id == VectorSSMapId.RubberRidge ? 27f : 33f;
+                activeRivalAi.Configure(activeRoute.samples, activeRoute.TotalLength, rivalStartDistance, cruiseSpeed, selectedMap.id == VectorSSMapId.ScraplineYard ? 0.72f : 0.56f);
+            }
 
             Camera camera = ConfigureCamera(activePlayer);
             ConfigureHud(activePlayer);
@@ -469,6 +486,10 @@ namespace GTX.Core
             hasActivePlayer = true;
             combatScore = 0;
             bestRouteDistance = 0f;
+            currentRouteDistance = 0f;
+            currentLap = 0;
+            targetLaps = Mathf.Max(1, selectedMap.lapCount);
+            nextCheckpointIndex = 0;
             raceStartTime = Time.time;
             nextRazorNearMissTime = 0f;
             screen = VectorSSScreen.Racing;
@@ -493,6 +514,7 @@ namespace GTX.Core
         private void ClearSession()
         {
             hasActivePlayer = false;
+            activeRivalAi = null;
             if (sessionRoot != null)
             {
                 Destroy(sessionRoot.gameObject);
@@ -517,11 +539,49 @@ namespace GTX.Core
             }
 
             float distance = activeRoute.DistanceAlongRoute(activePlayer.root.transform.position);
+            currentRouteDistance = distance;
             bestRouteDistance = Mathf.Max(bestRouteDistance, distance);
-            if (Time.time - raceStartTime > 16f && bestRouteDistance > activeRoute.TotalLength * 0.82f && distance < 32f)
+            UpdateCheckpointProgress();
+            if (CanCompleteLap(distance))
             {
-                CompleteRace();
+                currentLap++;
+                if (currentLap >= targetLaps)
+                {
+                    CompleteRace();
+                    return;
+                }
+
+                bestRouteDistance = 0f;
+                nextCheckpointIndex = 0;
             }
+        }
+
+        private void UpdateCheckpointProgress()
+        {
+            if (activeRoute.TotalLength <= 0.01f)
+            {
+                return;
+            }
+
+            while (nextCheckpointIndex < CheckpointFractions.Length && bestRouteDistance >= activeRoute.TotalLength * CheckpointFractions[nextCheckpointIndex])
+            {
+                nextCheckpointIndex++;
+                activePlayer.flowState?.AddFlow(4f + nextCheckpointIndex * 1.5f);
+                activePlayer.effects?.PlaySpeedLines(activePlayer.root.transform, 0.55f + nextCheckpointIndex * 0.1f);
+            }
+        }
+
+        private bool CanCompleteLap(float distance)
+        {
+            if (activeRoute.TotalLength <= 0.01f || Time.time - raceStartTime < 10f)
+            {
+                return false;
+            }
+
+            bool allCheckpointsCleared = nextCheckpointIndex >= CheckpointFractions.Length;
+            bool hasRunMostOfLap = bestRouteDistance > activeRoute.TotalLength * 0.86f;
+            bool backAtStart = distance < 38f || distance > activeRoute.TotalLength - 18f;
+            return allCheckpointsCleared && hasRunMostOfLap && backAtStart;
         }
 
         private void UpdateRazorNearMissFlow()
@@ -552,7 +612,14 @@ namespace GTX.Core
 
         private float RaceProgress01()
         {
-            return activeRoute.TotalLength <= 0f ? 0f : Mathf.Clamp01(bestRouteDistance / activeRoute.TotalLength);
+            if (activeRoute.TotalLength <= 0f)
+            {
+                return 0f;
+            }
+
+            float checkpointProgress = nextCheckpointIndex / (float)(CheckpointFractions.Length + 1);
+            float distanceProgress = Mathf.Clamp01(bestRouteDistance / activeRoute.TotalLength);
+            return Mathf.Max(checkpointProgress, distanceProgress);
         }
 
         private void ApplyMapPalette(VectorSSMapDefinition map)
@@ -629,6 +696,7 @@ namespace GTX.Core
             CreateRouteStripe(root, route);
             CreateRouteBarriers(root, route);
             CreateStartGate(root, route.PoseAtDistance(22f));
+            CreateCheckpointGates(root, route);
             CreateTrackMarkers(root, route);
             CreatePitDiorama(root, route);
             CreateMapDressing(root, map, route);
@@ -901,6 +969,36 @@ namespace GTX.Core
             CreateChamferedBox("Start Gate Header", gate, new Vector3(0f, 6.15f, 0f), Quaternion.identity, new Vector3(halfWidth * 2f + 1.2f, 0.9f, 0.9f), inkMaterial, true, 0.06f);
             CreatePrimitive("Start Gate Orange Tag", PrimitiveType.Cube, gate, new Vector3(-3.4f, 6.72f, -0.04f), Quaternion.identity, new Vector3(2.4f, 0.18f, 0.08f), trackMarkerMaterial, false);
             CreatePrimitive("Start Gate Blue Tag", PrimitiveType.Cube, gate, new Vector3(3.4f, 6.72f, -0.04f), Quaternion.identity, new Vector3(2.4f, 0.18f, 0.08f), trackMarkerBlueMaterial, false);
+        }
+
+        private void CreateCheckpointGates(Transform root, RuntimeTrackRoute route)
+        {
+            if (route.TotalLength <= 0.01f)
+            {
+                return;
+            }
+
+            for (int i = 0; i < CheckpointFractions.Length; i++)
+            {
+                TrackPose pose = route.PoseAtDistance(route.TotalLength * CheckpointFractions[i]);
+                CreateCheckpointGate(root, "Checkpoint Gate " + (i + 1), pose, i);
+            }
+        }
+
+        private void CreateCheckpointGate(Transform root, string name, TrackPose pose, int index)
+        {
+            Transform gate = new GameObject(name).transform;
+            gate.SetParent(root, false);
+            gate.localPosition = pose.position + Vector3.up * 0.2f;
+            gate.localRotation = pose.rotation;
+
+            float halfWidth = Mathf.Max(6f, pose.width * 0.5f - 1.1f);
+            Material primary = index % 2 == 0 ? trackMarkerBlueMaterial : trackMarkerMaterial;
+            Material secondary = index % 2 == 0 ? trackMarkerMaterial : trackMarkerBlueMaterial;
+            CreatePrimitive(name + " Cross Ink", PrimitiveType.Cube, gate, new Vector3(0f, 0.18f, 0f), Quaternion.identity, new Vector3(halfWidth * 2f, 0.09f, 0.22f), primary, false);
+            CreatePrimitive(name + " Left Flag", PrimitiveType.Cube, gate, new Vector3(-halfWidth, 1.55f, 0f), Quaternion.Euler(0f, 0f, -8f), new Vector3(0.28f, 2.4f, 0.18f), secondary, false);
+            CreatePrimitive(name + " Right Flag", PrimitiveType.Cube, gate, new Vector3(halfWidth, 1.55f, 0f), Quaternion.Euler(0f, 0f, 8f), new Vector3(0.28f, 2.4f, 0.18f), secondary, false);
+            CreatePrimitive(name + " Number Plate", PrimitiveType.Cube, gate, new Vector3(0f, 2.78f, 0f), Quaternion.identity, new Vector3(2.2f, 0.42f, 0.16f), primary, false);
         }
 
         private void CreateTrackMarkers(Transform root, RuntimeTrackRoute route)
@@ -1304,6 +1402,7 @@ namespace GTX.Core
             CreateOutlinedWedge(rival.transform, "Rival Cockpit", new Vector3(0f, 1.14f, -0.42f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1.2f, 0.56f, 1.32f), rivalMaterial, 1.08f);
             CreatePrimitive("Rival Target Stripe", PrimitiveType.Cube, rival.transform, new Vector3(0f, 1.01f, 1.15f), Quaternion.identity, new Vector3(1.6f, 0.08f, 0.22f), playerAccentMaterial, false);
             rival.AddComponent<DummyRivalTarget>();
+            rival.AddComponent<SimpleRouteRivalAI>();
             return rival;
         }
 

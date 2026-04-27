@@ -164,6 +164,7 @@ namespace GTX.Progression
         public string displayName;
         public string theme;
         public string purpose;
+        public int lapCount = 1;
         public VectorSSResources baseReward;
         public VectorSSResources mapBonus;
         public Color roadColor;
@@ -333,6 +334,7 @@ namespace GTX.Progression
                 displayName = "Blackline Circuit",
                 purpose = "Intro city/highway map",
                 theme = "Elevated cel-shaded city/highway with balanced driving.",
+                lapCount = 1,
                 baseReward = new VectorSSResources(32, 30, 30),
                 mapBonus = new VectorSSResources(14, 12, 12),
                 roadColor = new Color(0.17f, 0.19f, 0.21f, 1f),
@@ -345,6 +347,7 @@ namespace GTX.Progression
                 displayName = "Scrapline Yard",
                 purpose = "Combat-focused industrial map",
                 theme = "Containers, cranes, scrap props, and wide lanes.",
+                lapCount = 1,
                 baseReward = new VectorSSResources(36, 22, 22),
                 mapBonus = new VectorSSResources(36, 8, 8),
                 roadColor = new Color(0.20f, 0.20f, 0.18f, 1f),
@@ -357,6 +360,7 @@ namespace GTX.Progression
                 displayName = "Rubber Ridge",
                 purpose = "Drift/jump mountain map",
                 theme = "Canyon hairpins, tire walls, jumps, and a narrow bike line.",
+                lapCount = 1,
                 baseReward = new VectorSSResources(24, 24, 38),
                 mapBonus = new VectorSSResources(8, 10, 38),
                 roadColor = new Color(0.18f, 0.19f, 0.20f, 1f),
