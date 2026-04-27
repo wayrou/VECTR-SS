@@ -59,6 +59,7 @@ namespace GTX.Visuals
             float flow01 = flowState != null ? flowState.Normalized : 0f;
             bool boosting = vehicle != null && vehicle.IsBoosting;
             float boost01 = boosting ? 1f : 0f;
+            float speed01 = vehicle != null ? Mathf.InverseLerp(17f, 44f, vehicle.SpeedMetersPerSecond) : 0f;
             float pulse = 1f + Mathf.Sin(Time.time * Mathf.Lerp(5f, 13f, flow01)) * 0.012f * flow01;
             float outlineScale = 1f + (0.018f + flow01 * 0.034f + boost01 * 0.012f) * pulse;
 
@@ -71,10 +72,11 @@ namespace GTX.Visuals
             }
 
             UpdateBoostTrail(flow01, boosting);
-            if ((boosting || flow01 > 0.58f) && effects != null && Time.time >= nextSpeedLineTime)
+            if ((boosting || flow01 > 0.58f || speed01 > 0.28f) && effects != null && Time.time >= nextSpeedLineTime)
             {
-                nextSpeedLineTime = Time.time + Mathf.Lerp(speedLineInterval, 0.06f, flow01);
-                effects.PlaySpeedLines(transform, Mathf.Clamp01(flow01 + boost01 * 0.35f));
+                float intensity = Mathf.Clamp01(Mathf.Max(flow01, speed01) + boost01 * 0.25f);
+                nextSpeedLineTime = Time.time + Mathf.Lerp(speedLineInterval, 0.055f, intensity);
+                effects.PlaySpeedLines(transform, intensity);
             }
         }
 

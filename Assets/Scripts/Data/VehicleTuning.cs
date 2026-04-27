@@ -14,7 +14,7 @@ namespace GTX.Data
         public float idleRpm = 900f;
         public float redlineRpm = 7600f;
         public float stallRpm = 450f;
-        public float peakTorque = 540f;
+        public float peakTorque = 720f;
         public AnimationCurve torqueCurve = new AnimationCurve(
             new Keyframe(0f, 0.45f),
             new Keyframe(0.35f, 0.82f),
@@ -45,11 +45,11 @@ namespace GTX.Data
         [Header("Handling")]
         public float steeringAngle = 34f;
         public float steeringAngleAtSpeed = 9f;
-        public float steeringSpeedReference = 42f;
-        public float brakeTorque = 3300f;
+        public float steeringSpeedReference = 50f;
+        public float brakeTorque = 4200f;
         public float handbrakeTorque = 5200f;
-        public float maxDriveTorque = 1650f;
-        public float rigidbodyFallbackDriveForce = 9500f;
+        public float maxDriveTorque = 2550f;
+        public float rigidbodyFallbackDriveForce = 13500f;
         public float rigidbodyFallbackBrakeDrag = 6f;
         public float arcadeYawAssist = 0.9f;
         public float tractionControl = 0.28f;
@@ -67,7 +67,7 @@ namespace GTX.Data
         public float boostCapacity = 100f;
         public float boostBurnPerSecond = 28f;
         public float boostRegenPerSecond = 11f;
-        public float boostTorqueMultiplier = 1.35f;
+        public float boostTorqueMultiplier = 1.58f;
         public float boostHeatPerSecond = 34f;
         public float boostCoolPerSecond = 18f;
         public float overheatThreshold = 100f;

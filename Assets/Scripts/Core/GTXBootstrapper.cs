@@ -789,16 +789,92 @@ namespace GTX.Core
 
                 Vector3 forward = flat.normalized;
                 Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
-                float width = (route.widths[i] + route.widths[end]) * 0.5f;
+                float startWidth = route.widths[i];
+                float endWidth = route.widths[end];
                 float length = flat.magnitude + 0.35f;
                 Quaternion rotation = Quaternion.LookRotation(forward, Vector3.up);
-                Vector3 center = (a + b) * 0.5f + Vector3.up * 0.64f;
-                Vector3 left = center - right * (width * 0.5f + 0.78f);
-                Vector3 rightPosition = center + right * (width * 0.5f + 0.78f);
+                Vector3 centerLift = Vector3.up * 0.64f;
+                Vector3 leftStart = a + centerLift - right * (startWidth * 0.5f + 0.78f);
+                Vector3 leftEnd = b + centerLift - right * (endWidth * 0.5f + 0.78f);
+                Vector3 rightStart = a + centerLift + right * (startWidth * 0.5f + 0.78f);
+                Vector3 rightEnd = b + centerLift + right * (endWidth * 0.5f + 0.78f);
 
-                CreateRoundedBarrierRail(root, "Loop Left Rail " + i, left, rotation, length);
-                CreateRoundedBarrierRail(root, "Loop Right Rail " + i, rightPosition, rotation, length);
+                if (!RailWouldBlockRoute(route, i, end, leftStart, leftEnd))
+                {
+                    CreateRoundedBarrierRail(root, "Loop Left Rail " + i, (leftStart + leftEnd) * 0.5f, rotation, length);
+                }
+
+                if (!RailWouldBlockRoute(route, i, end, rightStart, rightEnd))
+                {
+                    CreateRoundedBarrierRail(root, "Loop Right Rail " + i, (rightStart + rightEnd) * 0.5f, rotation, length);
+                }
             }
+        }
+
+        private static bool RailWouldBlockRoute(RuntimeTrackRoute route, int startIndex, int endIndex, Vector3 railStart, Vector3 railEnd)
+        {
+            if (route.samples == null || route.widths == null || route.samples.Length < 4)
+            {
+                return false;
+            }
+
+            int segmentCount = route.samples.Length - 1;
+            int start = NormalizeRouteIndex(startIndex, segmentCount);
+            int end = NormalizeRouteIndex(endIndex, segmentCount);
+            for (int sample = 0; sample <= 6; sample++)
+            {
+                Vector3 point = Vector3.Lerp(railStart, railEnd, sample / 6f);
+                for (int i = 0; i < segmentCount; i++)
+                {
+                    if (RouteIndexNear(i, start, segmentCount) || RouteIndexNear(i, end, segmentCount))
+                    {
+                        continue;
+                    }
+
+                    float distance = DistancePointToSegmentXZ(point, route.samples[i], route.samples[i + 1]);
+                    float localHalfWidth = (route.widths[i] + route.widths[i + 1]) * 0.25f;
+                    if (distance < localHalfWidth + 1.55f)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RouteIndexNear(int candidate, int anchor, int segmentCount)
+        {
+            int distance = Mathf.Abs(NormalizeRouteIndex(candidate, segmentCount) - anchor);
+            distance = Mathf.Min(distance, segmentCount - distance);
+            return distance <= 8;
+        }
+
+        private static int NormalizeRouteIndex(int index, int segmentCount)
+        {
+            if (segmentCount <= 0)
+            {
+                return 0;
+            }
+
+            int normalized = index % segmentCount;
+            return normalized < 0 ? normalized + segmentCount : normalized;
+        }
+
+        private static float DistancePointToSegmentXZ(Vector3 point, Vector3 a, Vector3 b)
+        {
+            Vector2 p = new Vector2(point.x, point.z);
+            Vector2 start = new Vector2(a.x, a.z);
+            Vector2 end = new Vector2(b.x, b.z);
+            Vector2 segment = end - start;
+            float lengthSq = segment.sqrMagnitude;
+            if (lengthSq < 0.0001f)
+            {
+                return Vector2.Distance(p, start);
+            }
+
+            float t = Mathf.Clamp01(Vector2.Dot(p - start, segment) / lengthSq);
+            return Vector2.Distance(p, start + segment * t);
         }
 
         private void CreateRoundedBarrierRail(Transform root, string name, Vector3 position, Quaternion rotation, float length)

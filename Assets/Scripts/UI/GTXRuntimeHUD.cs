@@ -271,7 +271,7 @@ namespace GTX.UI
 
         private void UpdateHud(GTXTelemetrySnapshot snapshot)
         {
-            speedText.text = Mathf.RoundToInt(snapshot.speedKph).ToString("000");
+            speedText.text = Mathf.RoundToInt(snapshot.speedKph * 0.621371f).ToString("000");
             gearText.text = FormatGear(snapshot.gear);
             rpmText.text = Mathf.RoundToInt(snapshot.rpm).ToString("0") + " RPM";
             boostText.text = "BOOST " + Mathf.RoundToInt(snapshot.boost01 * 100f) + "%";
@@ -359,7 +359,7 @@ namespace GTX.UI
             RectTransform root = canvas.GetComponent<RectTransform>();
             hudPanel = Panel("HUD", root, Anchor.BottomLeft, new Vector2(36f, 36f), new Vector2(356f, 188f), new Color(0.015f, 0.02f, 0.045f, 0.82f));
             speedText = Label("Speed", hudPanel.transform, "000", 66, TextAnchor.MiddleLeft, new Vector2(20f, 98f), new Vector2(170f, 72f));
-            Label("SpeedUnit", hudPanel.transform, "KM/H", 15, TextAnchor.MiddleLeft, new Vector2(194f, 132f), new Vector2(72f, 22f));
+            Label("SpeedUnit", hudPanel.transform, "MPH", 15, TextAnchor.MiddleLeft, new Vector2(194f, 132f), new Vector2(72f, 22f));
             gearText = Label("Gear", hudPanel.transform, "G1", 38, TextAnchor.MiddleCenter, new Vector2(270f, 102f), new Vector2(62f, 56f));
             rpmText = Label("RPM", hudPanel.transform, "900 RPM", 16, TextAnchor.MiddleLeft, new Vector2(20f, 72f), new Vector2(132f, 22f));
             rpmSlider = Meter("RPM Meter", hudPanel.transform, new Vector2(154f, 78f), new Vector2(178f, 10f), new Color(1f, 0.48f, 0.08f, 1f));
