@@ -23,12 +23,14 @@ namespace GTX.Vehicle
         public ShiftQuality LastShiftQuality { get; private set; }
         public float LastShiftAge { get; private set; } = 99f;
         public float ShiftProgress => shiftDuration <= 0f ? 1f : Mathf.Clamp01(shiftTimer / shiftDuration);
+        public float ReverseHoldProgress { get; private set; }
         public float CurrentRatio => currentRatio;
 
         private float currentRatio = 1f;
         private float shiftTimer;
         private float shiftCooldownTimer;
         private float shiftDuration;
+        private float reverseHoldTimer;
 
         public void Reset(VehicleTuning tuning)
         {
@@ -37,9 +39,11 @@ namespace GTX.Vehicle
             IsShifting = false;
             LastShiftQuality = ShiftQuality.None;
             LastShiftAge = 99f;
+            ReverseHoldProgress = 0f;
             shiftTimer = 0f;
             shiftCooldownTimer = 0f;
             shiftDuration = tuning != null ? tuning.shiftDuration : 0.18f;
+            reverseHoldTimer = 0f;
         }
 
         public void Tick(VehicleTuning tuning, VehicleInputState input, float engineRpm, float deltaTime)
@@ -59,12 +63,38 @@ namespace GTX.Vehicle
 
             if (input.shiftUp)
             {
+                ResetReverseHold();
                 RequestShift(tuning, CurrentGear + 1, engineRpm);
             }
             else if (input.shiftDown)
             {
                 RequestShift(tuning, CurrentGear - 1, engineRpm);
             }
+
+            TickReverseHold(tuning, input, engineRpm, deltaTime);
+        }
+
+        private void TickReverseHold(VehicleTuning tuning, VehicleInputState input, float engineRpm, float deltaTime)
+        {
+            if (tuning == null || !input.shiftDownHeld || CurrentGear == ReverseGear)
+            {
+                ResetReverseHold();
+                return;
+            }
+
+            reverseHoldTimer += deltaTime;
+            float holdSeconds = Mathf.Max(0.12f, tuning.reverseShiftHoldSeconds);
+            ReverseHoldProgress = Mathf.Clamp01(reverseHoldTimer / holdSeconds);
+            if (reverseHoldTimer >= holdSeconds)
+            {
+                RequestShift(tuning, ReverseGear, engineRpm);
+            }
+        }
+
+        private void ResetReverseHold()
+        {
+            reverseHoldTimer = 0f;
+            ReverseHoldProgress = 0f;
         }
 
         public bool RequestShift(VehicleTuning tuning, int targetGear, float engineRpm)

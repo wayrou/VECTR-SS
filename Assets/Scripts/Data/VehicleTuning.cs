@@ -31,6 +31,7 @@ namespace GTX.Data
         public float[] forwardRatios = { 3.1f, 2.2f, 1.62f, 1.22f, 0.96f, 0.78f };
         public float shiftDuration = 0.18f;
         public float shiftCooldown = 0.08f;
+        public float reverseShiftHoldSeconds = 1.25f;
         public float perfectShiftRpmMin = 6800f;
         public float perfectShiftRpmMax = 7350f;
         public float perfectShiftTorqueMultiplier = 1.16f;
@@ -53,6 +54,11 @@ namespace GTX.Data
         public float rigidbodyFallbackBrakeDrag = 6f;
         public float arcadeYawAssist = 0.9f;
         public float tractionControl = 0.28f;
+        public float stuckLaunchAssistSpeed = 3.2f;
+        public float stuckLaunchAssistForce = 7.5f;
+        public float collisionRecoveryDuration = 0.85f;
+        public float collisionRecoveryDriveForce = 10.5f;
+        public float collisionRecoveryNudgeForce = 4.8f;
 
         [Header("Drift")]
         public float driftSlipThreshold = 0.24f;

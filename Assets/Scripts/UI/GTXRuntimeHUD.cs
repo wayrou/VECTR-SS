@@ -375,11 +375,11 @@ namespace GTX.UI
             Label("Controls Title", controlsPanel.transform, "CONTROLS", 12, TextAnchor.MiddleLeft, new Vector2(12f, 78f), new Vector2(86f, 18f));
             controlsText = Label("Controls Text", controlsPanel.transform,
                 "W/S throttle/brake   A/D steer\n" +
-                "Arrows rotate camera   Q/E gears\n" +
-                "Shift clutch   Space drift   F boost\n" +
-                "Z/C slam   X guard   R reset\n" +
+                "Arrows camera   Q/E gears\n" +
+                "Hold Q reverse   Shift clutch   Space drift\n" +
+                "F boost   Z/C slam   X guard   R reset\n" +
                 "Tab garage   ` QUAC   F3 flow   F1 hide",
-                10, TextAnchor.MiddleLeft, new Vector2(12f, 6f), new Vector2(306f, 72f));
+                9, TextAnchor.MiddleLeft, new Vector2(12f, 3f), new Vector2(306f, 76f));
 
             flowPanel = Panel("Debug Flow", root, Anchor.TopRight, new Vector2(-32f, -32f), new Vector2(224f, 72f), new Color(0.015f, 0.02f, 0.045f, 0.78f));
             flowText = Label("Flow Text", flowPanel.transform, "FLOW 0%", 15, TextAnchor.MiddleLeft, new Vector2(16f, 38f), new Vector2(92f, 20f));

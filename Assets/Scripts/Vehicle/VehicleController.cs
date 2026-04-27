@@ -45,6 +45,8 @@ namespace GTX.Vehicle
         private WheelCollider[] allWheels;
         private Vector3 baseCenterOfMass;
         private bool hasBaseCenterOfMass;
+        private Vector3 collisionRecoveryNormal;
+        private float collisionRecoveryTimer;
 
         public void SetInput(VehicleInputState input)
         {
@@ -299,7 +301,51 @@ namespace GTX.Vehicle
             float speed = SpeedMetersPerSecond;
             body.AddForce(-transform.up * tuning.downforce * speed, ForceMode.Force);
             body.AddRelativeTorque(Vector3.up * CurrentInput.steer * tuning.arcadeYawAssist * Mathf.Clamp01(speed / 25f), ForceMode.Acceleration);
+            ApplyLaunchAndCollisionRecovery(deltaTime);
             drift.ApplyArcadeAssist(tuning, body, CurrentInput, deltaTime);
+        }
+
+        private void ApplyLaunchAndCollisionRecovery(float deltaTime)
+        {
+            float forwardSpeed = Vector3.Dot(body.velocity, transform.forward);
+            bool drivingForward = CurrentInput.throttle > 0.08f && gearbox.CurrentGear > GearboxController.NeutralGear;
+            bool slowForward = forwardSpeed < tuning.stuckLaunchAssistSpeed;
+
+            if (drivingForward && slowForward)
+            {
+                body.AddForce(transform.forward * CurrentInput.throttle * tuning.stuckLaunchAssistForce, ForceMode.Acceleration);
+            }
+
+            if (collisionRecoveryTimer <= 0f)
+            {
+                return;
+            }
+
+            collisionRecoveryTimer = Mathf.Max(0f, collisionRecoveryTimer - deltaTime);
+            Vector3 normal = collisionRecoveryNormal;
+            normal.y = 0f;
+            if (normal.sqrMagnitude < 0.001f)
+            {
+                return;
+            }
+
+            normal.Normalize();
+            float inwardSpeed = Vector3.Dot(body.velocity, -normal);
+            if (inwardSpeed > 0f)
+            {
+                body.velocity += normal * inwardSpeed * 0.58f;
+            }
+
+            if (drivingForward)
+            {
+                Vector3 wallSlideForward = Vector3.ProjectOnPlane(transform.forward, normal);
+                if (wallSlideForward.sqrMagnitude > 0.001f)
+                {
+                    body.AddForce(wallSlideForward.normalized * CurrentInput.throttle * tuning.collisionRecoveryDriveForce, ForceMode.Acceleration);
+                }
+
+                body.AddForce(normal * tuning.collisionRecoveryNudgeForce, ForceMode.Acceleration);
+            }
         }
 
         private static void SetSteer(WheelCollider wheel, float angle)
@@ -342,6 +388,11 @@ namespace GTX.Vehicle
                 return "BOOST OVERHEAT";
             }
 
+            if (gearbox.ReverseHoldProgress > 0.15f && gearbox.CurrentGear != GearboxController.ReverseGear)
+            {
+                return "HOLD Q FOR REVERSE";
+            }
+
             if (gearbox.LastShiftAge < tuning.shiftJudgementWindow)
             {
                 if (gearbox.LastShiftQuality == ShiftQuality.Perfect)
@@ -365,7 +416,39 @@ namespace GTX.Vehicle
                 return "BOOST";
             }
 
+            if (gearbox.CurrentGear == GearboxController.ReverseGear)
+            {
+                return "REVERSE";
+            }
+
             return gearbox.CurrentGear == GearboxController.NeutralGear ? "NEUTRAL" : "READY";
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            RegisterWallRecoveryContact(collision);
+        }
+
+        private void OnCollisionStay(Collision collision)
+        {
+            RegisterWallRecoveryContact(collision);
+        }
+
+        private void RegisterWallRecoveryContact(Collision collision)
+        {
+            if (tuning == null || collision.contactCount <= 0)
+            {
+                return;
+            }
+
+            ContactPoint contact = collision.GetContact(0);
+            if (Mathf.Abs(contact.normal.y) > 0.62f)
+            {
+                return;
+            }
+
+            collisionRecoveryNormal = contact.normal;
+            collisionRecoveryTimer = Mathf.Max(collisionRecoveryTimer, tuning.collisionRecoveryDuration);
         }
     }
 }

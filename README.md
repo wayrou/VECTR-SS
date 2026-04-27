@@ -38,6 +38,7 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - `Left Shift`: clutch
 - `E`: upshift
 - `Q`: downshift
+- Hold `Q`: quick-shift to Reverse
 - `F`: boost
 - `Z`: side slam left / Razor side check left
 - `C`: side slam right / Razor side check right

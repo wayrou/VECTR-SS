@@ -13,6 +13,7 @@ namespace GTX.Vehicle
         public bool boost;
         public bool shiftUp;
         public bool shiftDown;
+        public bool shiftDownHeld;
 
         public static VehicleInputState FromUnityInput()
         {
@@ -36,7 +37,8 @@ namespace GTX.Vehicle
                 handbrake = Input.GetKey(KeyCode.Space),
                 boost = Input.GetKey(KeyCode.F),
                 shiftUp = Input.GetKeyDown(KeyCode.E),
-                shiftDown = Input.GetKeyDown(KeyCode.Q)
+                shiftDown = Input.GetKeyDown(KeyCode.Q),
+                shiftDownHeld = Input.GetKey(KeyCode.Q)
             };
 
             input.steer = Mathf.Clamp(input.steer, -1f, 1f);
