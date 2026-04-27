@@ -109,12 +109,17 @@ namespace GTX.Core
 
             if (vehicle.IsDrifting && vehicle.SpeedKph > 45f)
             {
-                flowState.AddFlow(Time.deltaTime * 4.8f);
+                flowState.AddFlow(Time.deltaTime * 6.8f);
                 if (effects != null && Time.time >= nextSkidTime)
                 {
-                    nextSkidTime = Time.time + 0.12f;
-                    effects.PlaySkid(transform.position - transform.right * 0.9f, transform.forward, 0.75f);
-                    effects.PlaySkid(transform.position + transform.right * 0.9f, transform.forward, 0.75f);
+                    float intensity = Mathf.Clamp01(0.65f + vehicle.Drift.DriftAmount * 0.45f);
+                    nextSkidTime = Time.time + Mathf.Lerp(0.12f, 0.055f, vehicle.Drift.DriftAmount);
+                    effects.PlaySkid(transform.position - transform.right * 0.9f, transform.forward, intensity);
+                    effects.PlaySkid(transform.position + transform.right * 0.9f, transform.forward, intensity);
+                    if (vehicle.Drift.DriftAmount > 0.55f)
+                    {
+                        effects.PlaySpeedLines(transform, intensity * 0.72f);
+                    }
                 }
             }
         }

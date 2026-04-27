@@ -55,13 +55,17 @@ namespace GTX.Data
         public float tractionControl = 0.28f;
 
         [Header("Drift")]
-        public float driftSlipThreshold = 0.36f;
-        public float driftMinSpeed = 8f;
-        public float driftYawAssist = 1.35f;
-        public float driftSideGrip = 0.62f;
+        public float driftSlipThreshold = 0.24f;
+        public float driftMinSpeed = 5.5f;
+        public float driftYawAssist = 2.65f;
+        public float driftEntryYawKick = 4.8f;
+        public float driftCounterSteerAssist = 0.72f;
+        public float driftForwardAssist = 5.8f;
+        public float driftSidewaysThrow = 2.4f;
+        public float driftSideGrip = 0.44f;
         public float normalSideGrip = 1f;
-        public float handbrakeRearGrip = 0.42f;
-        public float clutchKickDuration = 0.45f;
+        public float handbrakeRearGrip = 0.24f;
+        public float clutchKickDuration = 0.64f;
 
         [Header("Boost")]
         public float boostCapacity = 100f;
