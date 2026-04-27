@@ -11,7 +11,7 @@ namespace GTX.Combat
         [SerializeField] private Rigidbody body;
         [SerializeField] private FlowState flowState;
         [SerializeField] private RuntimeImpactEffects effects;
-        [SerializeField] private KeyCode guardKey = KeyCode.X;
+        [SerializeField] private KeyCode guardKey = KeyCode.N;
         [SerializeField] private float activeSeconds = 0.42f;
         [SerializeField] private float cooldownSeconds = 1.15f;
         [SerializeField] private float minimumSpeed = 3f;

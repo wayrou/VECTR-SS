@@ -67,6 +67,20 @@ namespace GTX.Vehicle
             IsDrifting = DriftAmount > 0.2f;
         }
 
+        public void TriggerAssistedClutchKick(VehicleTuning tuning, Rigidbody body, VehicleInputState input, float strength)
+        {
+            if (tuning == null || body == null)
+            {
+                return;
+            }
+
+            Vector3 localVelocity = body.transform.InverseTransformDirection(body.velocity);
+            clutchKickTimer = Mathf.Max(clutchKickTimer, tuning.clutchKickDuration * Mathf.Clamp(strength, 0.75f, 1.45f));
+            PrimeEntryKick(input, localVelocity);
+            DriftAmount = Mathf.Max(DriftAmount, 0.62f);
+            IsDrifting = true;
+        }
+
         private void PrimeEntryKick(VehicleInputState input, Vector3 localVelocity)
         {
             float direction = Mathf.Abs(input.steer) > 0.05f ? Mathf.Sign(input.steer) : Mathf.Sign(localVelocity.x);

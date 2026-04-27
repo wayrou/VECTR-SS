@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using GTX.Data;
 using UnityEngine;
 
@@ -36,6 +37,35 @@ namespace GTX.Progression
         Drift,
         Volt,
         Bike
+    }
+
+    public enum VectorSSModuleCategory
+    {
+        Sensor,
+        ActiveControl,
+        Combat,
+        Utility
+    }
+
+    public enum VectorSSModuleSlot
+    {
+        Sensor,
+        Control,
+        Combat,
+        Utility
+    }
+
+    public enum VectorSSModuleWidget
+    {
+        None,
+        HeatGauge,
+        ClutchKick,
+        BoostValve,
+        BrakeBias,
+        DifferentialLock,
+        ArmorPlate,
+        SnapLean,
+        RearBrakeSlide
     }
 
     [Serializable]
@@ -145,6 +175,10 @@ namespace GTX.Progression
         public Vector3 colliderSize = new Vector3(2.25f, 0.95f, 4.45f);
         public Vector3 colliderCenter = new Vector3(0f, 0.72f, 0f);
         public bool isBike;
+        public int sensorSlots = 1;
+        public int controlSlots = 2;
+        public int combatSlots = 1;
+        public int utilitySlots = 1;
 
         public string StatsLine
         {
@@ -154,6 +188,23 @@ namespace GTX.Progression
                     "  Turn " + steeringMultiplier.ToString("0.00") +
                     "  Boost " + boostMultiplier.ToString("0.00") +
                     "  Ram " + ramMultiplier.ToString("0.00");
+            }
+        }
+
+        public int SlotCapacity(VectorSSModuleSlot slot)
+        {
+            switch (slot)
+            {
+                case VectorSSModuleSlot.Sensor:
+                    return sensorSlots;
+                case VectorSSModuleSlot.Control:
+                    return controlSlots;
+                case VectorSSModuleSlot.Combat:
+                    return combatSlots;
+                case VectorSSModuleSlot.Utility:
+                    return utilitySlots;
+                default:
+                    return 0;
             }
         }
     }
@@ -179,6 +230,60 @@ namespace GTX.Progression
         public string description;
         public VectorSSResources cost;
         public VectorSSVehicleClass? preferredClass;
+    }
+
+    public sealed class VectorSSModuleDefinition
+    {
+        public string id;
+        public string displayName;
+        public string description;
+        public VectorSSModuleCategory category;
+        public VectorSSModuleSlot slot;
+        public VectorSSModuleWidget widget;
+        public VectorSSResources cost;
+        public VectorSSVehicleId? allowedVehicle;
+        public VectorSSVehicleClass? allowedClass;
+        public string controlHint;
+        public Vector2 defaultHudPosition = new Vector2(1488f, -210f);
+        public float defaultHudScale = 0.9f;
+
+        public bool Supports(VectorSSVehicleDefinition vehicle)
+        {
+            if (vehicle == null)
+            {
+                return false;
+            }
+
+            if (allowedVehicle != null && allowedVehicle.Value != vehicle.id)
+            {
+                return false;
+            }
+
+            if (allowedClass != null && allowedClass.Value != vehicle.vehicleClass)
+            {
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    public sealed class VectorSSModuleHudLayout
+    {
+        public VectorSSVehicleId vehicleId;
+        public string moduleId;
+        public Vector2 position;
+        public float scale = 0.9f;
+        public bool visible = true;
+
+        public void ResetToDefinition(VectorSSVehicleId vehicle, VectorSSModuleDefinition module)
+        {
+            vehicleId = vehicle;
+            moduleId = module != null ? module.id : moduleId;
+            position = module != null ? module.defaultHudPosition : new Vector2(1488f, -210f);
+            scale = module != null ? module.defaultHudScale : 0.9f;
+            visible = true;
+        }
     }
 
     public sealed class VectorSSRaceResult
@@ -211,6 +316,9 @@ namespace GTX.Progression
         public VectorSSVehicleId selectedVehicle = VectorSSVehicleId.Hammer;
         public VectorSSTuningState tuning = new VectorSSTuningState();
         public readonly HashSet<string> purchasedUpgrades = new HashSet<string>();
+        public readonly HashSet<string> purchasedModules = new HashSet<string>();
+        public readonly Dictionary<VectorSSVehicleId, HashSet<string>> installedModules = new Dictionary<VectorSSVehicleId, HashSet<string>>();
+        public readonly Dictionary<string, VectorSSModuleHudLayout> moduleHudLayouts = new Dictionary<string, VectorSSModuleHudLayout>();
 
         public bool HasUpgrade(string id)
         {
@@ -226,6 +334,147 @@ namespace GTX.Progression
 
             purchasedUpgrades.Add(upgrade.id);
             return true;
+        }
+
+        public bool HasModule(string id)
+        {
+            return purchasedModules.Contains(id);
+        }
+
+        public bool IsModuleInstalled(VectorSSVehicleId vehicle, string moduleId)
+        {
+            HashSet<string> modules;
+            return installedModules.TryGetValue(vehicle, out modules) && modules.Contains(moduleId);
+        }
+
+        public HashSet<string> InstalledModulesFor(VectorSSVehicleId vehicle, bool createIfMissing)
+        {
+            HashSet<string> modules;
+            if (installedModules.TryGetValue(vehicle, out modules))
+            {
+                return modules;
+            }
+
+            if (!createIfMissing)
+            {
+                return null;
+            }
+
+            modules = new HashSet<string>();
+            installedModules.Add(vehicle, modules);
+            return modules;
+        }
+
+        public int InstalledSlotCount(VectorSSVehicleId vehicle, VectorSSModuleSlot slot)
+        {
+            HashSet<string> modules = InstalledModulesFor(vehicle, false);
+            if (modules == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            foreach (string moduleId in modules)
+            {
+                VectorSSModuleDefinition module = VectorSSCatalog.GetModule(moduleId);
+                if (module != null && module.slot == slot)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        public bool TryPurchaseModule(VectorSSModuleDefinition module)
+        {
+            if (module == null || HasModule(module.id) || !resources.TrySpend(module.cost))
+            {
+                return false;
+            }
+
+            purchasedModules.Add(module.id);
+            return true;
+        }
+
+        public bool TryInstallModule(VectorSSVehicleDefinition vehicle, VectorSSModuleDefinition module, out string message)
+        {
+            message = string.Empty;
+            if (vehicle == null || module == null)
+            {
+                message = "Missing vehicle or module.";
+                return false;
+            }
+
+            if (!HasModule(module.id))
+            {
+                message = "Purchase this module first.";
+                return false;
+            }
+
+            if (!module.Supports(vehicle))
+            {
+                message = module.displayName + " is not supported by " + vehicle.displayName + ".";
+                return false;
+            }
+
+            HashSet<string> modules = InstalledModulesFor(vehicle.id, true);
+            if (modules.Contains(module.id))
+            {
+                message = module.displayName + " is already installed.";
+                return false;
+            }
+
+            int capacity = vehicle.SlotCapacity(module.slot);
+            if (InstalledSlotCount(vehicle.id, module.slot) >= capacity)
+            {
+                message = vehicle.displayName + " has no open " + module.slot + " slot.";
+                return false;
+            }
+
+            modules.Add(module.id);
+            GetModuleLayout(vehicle.id, module, true);
+            message = "Installed " + module.displayName + ".";
+            return true;
+        }
+
+        public void UninstallModule(VectorSSVehicleId vehicle, string moduleId)
+        {
+            HashSet<string> modules = InstalledModulesFor(vehicle, false);
+            if (modules != null)
+            {
+                modules.Remove(moduleId);
+            }
+        }
+
+        public VectorSSModuleHudLayout GetModuleLayout(VectorSSVehicleId vehicle, VectorSSModuleDefinition module, bool createIfMissing)
+        {
+            if (module == null)
+            {
+                return null;
+            }
+
+            string key = ModuleLayoutKey(vehicle, module.id);
+            VectorSSModuleHudLayout layout;
+            if (moduleHudLayouts.TryGetValue(key, out layout))
+            {
+                return layout;
+            }
+
+            if (!createIfMissing)
+            {
+                return null;
+            }
+
+            layout = new VectorSSModuleHudLayout();
+            layout.ResetToDefinition(vehicle, module);
+            moduleHudLayouts.Add(key, layout);
+            return layout;
+        }
+
+        public static string ModuleLayoutKey(VectorSSVehicleId vehicle, string moduleId)
+        {
+            return vehicle + ":" + moduleId;
         }
     }
 
@@ -253,7 +502,11 @@ namespace GTX.Progression
                 impactResistance = 1.38f,
                 nearMissFlowMultiplier = 0.8f,
                 visualScale = new Vector3(1.12f, 1f, 1.12f),
-                colliderSize = new Vector3(2.45f, 1.02f, 4.82f)
+                colliderSize = new Vector3(2.45f, 1.02f, 4.82f),
+                sensorSlots = 1,
+                controlSlots = 2,
+                combatSlots = 2,
+                utilitySlots = 1
             },
             new VectorSSVehicleDefinition
             {
@@ -275,7 +528,11 @@ namespace GTX.Progression
                 impactResistance = 0.82f,
                 nearMissFlowMultiplier = 1.14f,
                 visualScale = new Vector3(0.9f, 0.92f, 1.08f),
-                colliderSize = new Vector3(2.0f, 0.86f, 4.48f)
+                colliderSize = new Vector3(2.0f, 0.86f, 4.48f),
+                sensorSlots = 2,
+                controlSlots = 3,
+                combatSlots = 1,
+                utilitySlots = 1
             },
             new VectorSSVehicleDefinition
             {
@@ -297,7 +554,11 @@ namespace GTX.Progression
                 impactResistance = 0.9f,
                 nearMissFlowMultiplier = 1.02f,
                 visualScale = new Vector3(0.98f, 0.96f, 1.04f),
-                colliderSize = new Vector3(2.15f, 0.9f, 4.42f)
+                colliderSize = new Vector3(2.15f, 0.9f, 4.42f),
+                sensorSlots = 3,
+                controlSlots = 2,
+                combatSlots = 1,
+                utilitySlots = 1
             },
             new VectorSSVehicleDefinition
             {
@@ -322,7 +583,11 @@ namespace GTX.Progression
                 visualScale = new Vector3(0.58f, 1f, 0.92f),
                 colliderSize = new Vector3(0.92f, 1.25f, 2.8f),
                 colliderCenter = new Vector3(0f, 0.82f, 0f),
-                isBike = true
+                isBike = true,
+                sensorSlots = 2,
+                controlSlots = 3,
+                combatSlots = 1,
+                utilitySlots = 2
             }
         };
 
@@ -383,6 +648,108 @@ namespace GTX.Progression
             new VectorSSUpgradeDefinition { id = "boost_tuck_1", displayName = "Boost Tuck I", description = "Razor boost stability and top speed.", cost = new VectorSSResources(0, 50, 20), preferredClass = VectorSSVehicleClass.Bike }
         };
 
+        public static readonly VectorSSModuleDefinition[] Modules =
+        {
+            new VectorSSModuleDefinition
+            {
+                id = "heat_gauge",
+                displayName = "Heat Gauge",
+                description = "Adds a precise boost heat readout to the cockpit.",
+                category = VectorSSModuleCategory.Sensor,
+                slot = VectorSSModuleSlot.Sensor,
+                widget = VectorSSModuleWidget.HeatGauge,
+                cost = new VectorSSResources(10, 25, 0),
+                controlHint = string.Empty,
+                defaultHudPosition = new Vector2(1488f, -210f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "clutch_kick_assist",
+                displayName = "Clutch Kick Assist",
+                description = "Adds an X input that snaps the drivetrain into a drift entry without replacing manual clutch skill.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Control,
+                widget = VectorSSModuleWidget.ClutchKick,
+                cost = new VectorSSResources(25, 0, 45),
+                controlHint = "X clutch kick",
+                defaultHudPosition = new Vector2(1488f, -268f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "boost_valve_lever",
+                displayName = "Boost Valve Lever",
+                description = "Adds a V toggle for Low / Medium / High boost pressure.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Control,
+                widget = VectorSSModuleWidget.BoostValve,
+                cost = new VectorSSResources(25, 50, 0),
+                controlHint = "V boost valve",
+                defaultHudPosition = new Vector2(1488f, -326f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "brake_bias_dial",
+                displayName = "Brake Bias Dial",
+                description = "Adds [ and ] controls for front/rear brake balance.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Control,
+                widget = VectorSSModuleWidget.BrakeBias,
+                cost = new VectorSSResources(0, 25, 30),
+                controlHint = "[/] brake bias",
+                defaultHudPosition = new Vector2(1488f, -384f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "differential_lock_switch",
+                displayName = "Differential Lock Switch",
+                description = "Adds a G toggle for traction and ram stability at the cost of rotation.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Control,
+                widget = VectorSSModuleWidget.DifferentialLock,
+                cost = new VectorSSResources(60, 0, 20),
+                controlHint = "G diff lock",
+                defaultHudPosition = new Vector2(1488f, -442f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "armor_plate_deploy",
+                displayName = "Armor Plate Deploy",
+                description = "Adds a B control that briefly hardens the frame for impacts.",
+                category = VectorSSModuleCategory.Combat,
+                slot = VectorSSModuleSlot.Combat,
+                widget = VectorSSModuleWidget.ArmorPlate,
+                cost = new VectorSSResources(80, 20, 0),
+                controlHint = "B armor plates",
+                defaultHudPosition = new Vector2(1488f, -500f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "snap_lean_module",
+                displayName = "Snap Lean Module",
+                description = "Razor-only evasive lean burst for near-miss lines.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Utility,
+                widget = VectorSSModuleWidget.SnapLean,
+                cost = new VectorSSResources(0, 35, 45),
+                allowedVehicle = VectorSSVehicleId.Razor,
+                controlHint = "Left Alt snap lean",
+                defaultHudPosition = new Vector2(1488f, -558f)
+            },
+            new VectorSSModuleDefinition
+            {
+                id = "rear_brake_slide_controller",
+                displayName = "Rear Brake Slide Controller",
+                description = "Razor-only rear slide tuning and readout for tight shortcut entries.",
+                category = VectorSSModuleCategory.ActiveControl,
+                slot = VectorSSModuleSlot.Utility,
+                widget = VectorSSModuleWidget.RearBrakeSlide,
+                cost = new VectorSSResources(20, 0, 50),
+                allowedVehicle = VectorSSVehicleId.Razor,
+                controlHint = "Space rear slide",
+                defaultHudPosition = new Vector2(1488f, -616f)
+            }
+        };
+
         public static VectorSSVehicleDefinition GetVehicle(VectorSSVehicleId id)
         {
             for (int i = 0; i < Vehicles.Length; i++)
@@ -421,6 +788,19 @@ namespace GTX.Progression
 
             return null;
         }
+
+        public static VectorSSModuleDefinition GetModule(string id)
+        {
+            for (int i = 0; i < Modules.Length; i++)
+            {
+                if (Modules[i].id == id)
+                {
+                    return Modules[i];
+                }
+            }
+
+            return null;
+        }
     }
 
     public static class VectorSSSaveSystem
@@ -449,6 +829,9 @@ namespace GTX.Progression
                 }
             }
 
+            LoadModules(profile);
+            LoadModuleLayouts(profile);
+            NormalizeModules(profile);
             return profile;
         }
 
@@ -466,6 +849,8 @@ namespace GTX.Progression
             PlayerPrefs.SetInt(Prefix + "Vehicle", (int)profile.selectedVehicle);
             SaveTuning(profile.tuning);
             PlayerPrefs.SetString(Prefix + "Upgrades", string.Join("|", new List<string>(profile.purchasedUpgrades).ToArray()));
+            SaveModules(profile);
+            SaveModuleLayouts(profile);
             PlayerPrefs.Save();
         }
 
@@ -499,6 +884,199 @@ namespace GTX.Progression
             PlayerPrefs.SetFloat(Prefix + "Tune.CameraShake", tuning.cameraShake);
             PlayerPrefs.SetFloat(Prefix + "Tune.LeanResponse", tuning.leanResponse);
             PlayerPrefs.SetFloat(Prefix + "Tune.RearBrakeSlide", tuning.rearBrakeSlide);
+        }
+
+        private static void LoadModules(VectorSSPlayerProfile profile)
+        {
+            string rawPurchased = PlayerPrefs.GetString(Prefix + "Modules.Purchased", string.Empty);
+            if (!string.IsNullOrEmpty(rawPurchased))
+            {
+                string[] ids = rawPurchased.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < ids.Length; i++)
+                {
+                    if (VectorSSCatalog.GetModule(ids[i]) != null)
+                    {
+                        profile.purchasedModules.Add(ids[i]);
+                    }
+                }
+            }
+
+            string rawInstalled = PlayerPrefs.GetString(Prefix + "Modules.Installed", string.Empty);
+            if (string.IsNullOrEmpty(rawInstalled))
+            {
+                return;
+            }
+
+            string[] vehicles = rawInstalled.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < vehicles.Length; i++)
+            {
+                string[] pair = vehicles[i].Split(new[] { '=' }, 2);
+                if (pair.Length != 2)
+                {
+                    continue;
+                }
+
+                VectorSSVehicleId vehicleId;
+                if (!Enum.TryParse(pair[0], out vehicleId))
+                {
+                    continue;
+                }
+
+                HashSet<string> modules = profile.InstalledModulesFor(vehicleId, true);
+                string[] ids = pair[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int moduleIndex = 0; moduleIndex < ids.Length; moduleIndex++)
+                {
+                    if (VectorSSCatalog.GetModule(ids[moduleIndex]) != null)
+                    {
+                        modules.Add(ids[moduleIndex]);
+                    }
+                }
+            }
+        }
+
+        private static void SaveModules(VectorSSPlayerProfile profile)
+        {
+            PlayerPrefs.SetString(Prefix + "Modules.Purchased", string.Join("|", new List<string>(profile.purchasedModules).ToArray()));
+
+            List<string> vehicleEntries = new List<string>();
+            VectorSSVehicleId[] vehicles = (VectorSSVehicleId[])Enum.GetValues(typeof(VectorSSVehicleId));
+            for (int i = 0; i < vehicles.Length; i++)
+            {
+                HashSet<string> modules = profile.InstalledModulesFor(vehicles[i], false);
+                if (modules == null || modules.Count == 0)
+                {
+                    continue;
+                }
+
+                vehicleEntries.Add(vehicles[i] + "=" + string.Join(",", new List<string>(modules).ToArray()));
+            }
+
+            PlayerPrefs.SetString(Prefix + "Modules.Installed", string.Join(";", vehicleEntries.ToArray()));
+        }
+
+        private static void LoadModuleLayouts(VectorSSPlayerProfile profile)
+        {
+            string rawLayouts = PlayerPrefs.GetString(Prefix + "Modules.Layouts", string.Empty);
+            if (string.IsNullOrEmpty(rawLayouts))
+            {
+                return;
+            }
+
+            string[] entries = rawLayouts.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < entries.Length; i++)
+            {
+                string[] parts = entries[i].Split(':');
+                if (parts.Length != 6)
+                {
+                    continue;
+                }
+
+                VectorSSVehicleId vehicleId;
+                if (!Enum.TryParse(parts[0], out vehicleId))
+                {
+                    continue;
+                }
+
+                string moduleId = parts[1];
+                if (VectorSSCatalog.GetModule(moduleId) == null)
+                {
+                    continue;
+                }
+
+                float x;
+                float y;
+                float scale;
+                bool visible;
+                if (!TryParseFloat(parts[2], out x) || !TryParseFloat(parts[3], out y) || !TryParseFloat(parts[4], out scale) || !bool.TryParse(parts[5], out visible))
+                {
+                    continue;
+                }
+
+                profile.moduleHudLayouts[VectorSSPlayerProfile.ModuleLayoutKey(vehicleId, moduleId)] = new VectorSSModuleHudLayout
+                {
+                    vehicleId = vehicleId,
+                    moduleId = moduleId,
+                    position = new Vector2(x, y),
+                    scale = Mathf.Clamp(scale, 0.55f, 1.35f),
+                    visible = visible
+                };
+            }
+        }
+
+        private static void SaveModuleLayouts(VectorSSPlayerProfile profile)
+        {
+            List<string> entries = new List<string>();
+            foreach (KeyValuePair<string, VectorSSModuleHudLayout> pair in profile.moduleHudLayouts)
+            {
+                VectorSSModuleHudLayout layout = pair.Value;
+                if (layout == null || string.IsNullOrEmpty(layout.moduleId))
+                {
+                    continue;
+                }
+
+                entries.Add(layout.vehicleId + ":" + layout.moduleId + ":" +
+                    FormatFloat(layout.position.x) + ":" +
+                    FormatFloat(layout.position.y) + ":" +
+                    FormatFloat(layout.scale) + ":" +
+                    layout.visible);
+            }
+
+            PlayerPrefs.SetString(Prefix + "Modules.Layouts", string.Join("|", entries.ToArray()));
+        }
+
+        private static void NormalizeModules(VectorSSPlayerProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            VectorSSVehicleId[] vehicles = (VectorSSVehicleId[])Enum.GetValues(typeof(VectorSSVehicleId));
+            for (int vehicleIndex = 0; vehicleIndex < vehicles.Length; vehicleIndex++)
+            {
+                VectorSSVehicleDefinition vehicle = VectorSSCatalog.GetVehicle(vehicles[vehicleIndex]);
+                HashSet<string> modules = profile.InstalledModulesFor(vehicles[vehicleIndex], false);
+                if (modules == null)
+                {
+                    continue;
+                }
+
+                List<string> invalid = new List<string>();
+                Dictionary<VectorSSModuleSlot, int> slotUse = new Dictionary<VectorSSModuleSlot, int>();
+                foreach (string moduleId in modules)
+                {
+                    VectorSSModuleDefinition module = VectorSSCatalog.GetModule(moduleId);
+                    if (module == null || !profile.HasModule(moduleId) || !module.Supports(vehicle))
+                    {
+                        invalid.Add(moduleId);
+                        continue;
+                    }
+
+                    int used = slotUse.ContainsKey(module.slot) ? slotUse[module.slot] : 0;
+                    if (used >= vehicle.SlotCapacity(module.slot))
+                    {
+                        invalid.Add(moduleId);
+                        continue;
+                    }
+
+                    slotUse[module.slot] = used + 1;
+                }
+
+                for (int i = 0; i < invalid.Count; i++)
+                {
+                    modules.Remove(invalid[i]);
+                }
+            }
+        }
+
+        private static bool TryParseFloat(string raw, out float value)
+        {
+            return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static string FormatFloat(float value)
+        {
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using GTX.Data;
 using GTX.Flow;
@@ -38,6 +39,7 @@ namespace GTX.UI
         private GameObject controlsPanel;
         private GameObject flowPanel;
         private GameObject garagePanel;
+        private readonly List<string> moduleControlHints = new List<string>();
         private Slider rpmSlider;
         private Slider boostSlider;
         private Slider heatSlider;
@@ -51,6 +53,7 @@ namespace GTX.UI
         public event Action<GTXTuningProfile> TuningChanged;
         public GTXTuningProfile Tuning { get { return tuning; } }
         public GTXTuningPreset ActivePreset { get { return activePreset; } }
+        public Canvas HudCanvas { get { return canvas; } }
 
         public void ShowCallout(string callout)
         {
@@ -101,6 +104,36 @@ namespace GTX.UI
                 SetControlsVisible(false);
                 SetFlowDebugVisible(false);
             }
+        }
+
+        public void SetCoreHeatVisible(bool visible)
+        {
+            if (heatText != null)
+            {
+                heatText.gameObject.SetActive(visible);
+            }
+
+            if (heatSlider != null)
+            {
+                heatSlider.gameObject.SetActive(visible);
+            }
+        }
+
+        public void SetModuleControlHints(IEnumerable<string> hints)
+        {
+            moduleControlHints.Clear();
+            if (hints != null)
+            {
+                foreach (string hint in hints)
+                {
+                    if (!string.IsNullOrEmpty(hint))
+                    {
+                        moduleControlHints.Add(hint);
+                    }
+                }
+            }
+
+            RefreshControlsText();
         }
 
         public void ToggleControls()
@@ -373,13 +406,8 @@ namespace GTX.UI
 
             controlsPanel = Panel("Controls Overlay", root, Anchor.TopLeft, new Vector2(24f, -24f), new Vector2(330f, 104f), new Color(0.015f, 0.02f, 0.045f, 0.68f));
             Label("Controls Title", controlsPanel.transform, "CONTROLS", 12, TextAnchor.MiddleLeft, new Vector2(12f, 78f), new Vector2(86f, 18f));
-            controlsText = Label("Controls Text", controlsPanel.transform,
-                "W/S throttle/brake   A/D steer\n" +
-                "Arrows camera   Q/E gears\n" +
-                "Hold Q reverse   Shift clutch   Space drift\n" +
-                "F boost   Z/C slam   X guard   R reset\n" +
-                "Tab garage   ` QUAC   F3 flow   F1 hide",
-                9, TextAnchor.MiddleLeft, new Vector2(12f, 3f), new Vector2(306f, 76f));
+            controlsText = Label("Controls Text", controlsPanel.transform, string.Empty, 9, TextAnchor.MiddleLeft, new Vector2(12f, 3f), new Vector2(306f, 76f));
+            RefreshControlsText();
 
             flowPanel = Panel("Debug Flow", root, Anchor.TopRight, new Vector2(-32f, -32f), new Vector2(224f, 72f), new Color(0.015f, 0.02f, 0.045f, 0.78f));
             flowText = Label("Flow Text", flowPanel.transform, "FLOW 0%", 15, TextAnchor.MiddleLeft, new Vector2(16f, 38f), new Vector2(92f, 20f));
@@ -387,6 +415,28 @@ namespace GTX.UI
             flowPanel.SetActive(false);
 
             BuildGarage(root);
+        }
+
+        private void RefreshControlsText()
+        {
+            if (controlsText == null)
+            {
+                return;
+            }
+
+            string text =
+                "W/S throttle/brake   A/D steer\n" +
+                "Arrows camera   Q/E gears\n" +
+                "Hold Q reverse   Shift clutch   Space drift\n" +
+                "F boost   Z/C slam   N guard   R reset\n" +
+                "Tab garage   ` QUAC   F3 flow   F1 hide";
+
+            if (moduleControlHints.Count > 0)
+            {
+                text += "\nModules: " + string.Join("   ", moduleControlHints.ToArray());
+            }
+
+            controlsText.text = text;
         }
 
         private static void ConfigureCanvasScaler(Canvas targetCanvas)

@@ -40,6 +40,8 @@ namespace GTX.Core
         private RuntimeTrackRoute activeRoute;
         private PlayerRig activePlayer;
         private SimpleRouteRivalAI activeRivalAi;
+        private VectorSSVehicleModuleController activeModuleController;
+        private VectorSSModuleHUD activeModuleHud;
         private bool hasActivePlayer;
         private float raceStartTime;
         private float bestRouteDistance;
@@ -51,6 +53,7 @@ namespace GTX.Core
         private int combatScore;
         private Vector2 garageScroll;
         private Vector2 menuScroll;
+        private string garageMessage = string.Empty;
         private GUIStyle titleStyle;
         private GUIStyle headerStyle;
         private GUIStyle bodyStyle;
@@ -91,6 +94,7 @@ namespace GTX.Core
             {
                 UpdateRaceCompletion();
                 UpdateRazorNearMissFlow();
+                UpdateModuleHud();
             }
         }
 
@@ -328,6 +332,21 @@ namespace GTX.Core
                 DrawUpgrade(VectorSSCatalog.Upgrades[i]);
             }
 
+            GUILayout.Space(12f);
+            GUILayout.Label("Modules", headerStyle);
+            GUILayout.Label(SlotUsageText(selectedVehicle), bodyStyle);
+            if (!string.IsNullOrEmpty(garageMessage))
+            {
+                GUILayout.Label(garageMessage, bodyStyle);
+            }
+
+            for (int i = 0; i < VectorSSCatalog.Modules.Length; i++)
+            {
+                DrawModule(VectorSSCatalog.Modules[i]);
+            }
+
+            DrawModuleLayoutEditor();
+
             GUILayout.EndScrollView();
 
             if (GUILayout.Button("Save Garage", buttonStyle, GUILayout.Height(36f)))
@@ -446,6 +465,136 @@ namespace GTX.Core
             GUILayout.EndVertical();
         }
 
+        private void DrawModule(VectorSSModuleDefinition module)
+        {
+            if (module == null)
+            {
+                return;
+            }
+
+            bool supported = module.Supports(selectedVehicle);
+            bool purchased = playerProfile.HasModule(module.id);
+            bool installed = playerProfile.IsModuleInstalled(selectedVehicle.id, module.id);
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label(module.displayName + "  [" + module.category + " / " + module.slot + "]" + (installed ? "  INSTALLED" : purchased ? "  OWNED" : string.Empty), headerStyle);
+            GUILayout.Label(module.description, bodyStyle);
+            GUILayout.Label("Cost: " + module.cost + "   Widget: " + module.widget + (string.IsNullOrEmpty(module.controlHint) ? string.Empty : "   Control: " + module.controlHint), bodyStyle);
+            if (!supported)
+            {
+                GUILayout.Label("Unsupported by " + selectedVehicle.displayName + ".", bodyStyle);
+            }
+
+            GUILayout.BeginHorizontal();
+            GUI.enabled = supported && !purchased && playerProfile.resources.CanAfford(module.cost);
+            if (GUILayout.Button(purchased ? "Purchased" : "Buy", buttonStyle, GUILayout.Height(30f), GUILayout.Width(112f)))
+            {
+                if (playerProfile.TryPurchaseModule(module))
+                {
+                    garageMessage = "Purchased " + module.displayName + ".";
+                    VectorSSSaveSystem.Save(playerProfile);
+                }
+            }
+
+            GUI.enabled = supported && purchased && !installed;
+            if (GUILayout.Button("Install", buttonStyle, GUILayout.Height(30f), GUILayout.Width(112f)))
+            {
+                string message;
+                if (playerProfile.TryInstallModule(selectedVehicle, module, out message))
+                {
+                    garageMessage = message;
+                    VectorSSSaveSystem.Save(playerProfile);
+                }
+                else
+                {
+                    garageMessage = message;
+                }
+            }
+
+            GUI.enabled = installed;
+            if (GUILayout.Button("Uninstall", buttonStyle, GUILayout.Height(30f), GUILayout.Width(112f)))
+            {
+                playerProfile.UninstallModule(selectedVehicle.id, module.id);
+                garageMessage = "Uninstalled " + module.displayName + ".";
+                VectorSSSaveSystem.Save(playerProfile);
+            }
+
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+        private void DrawModuleLayoutEditor()
+        {
+            GUILayout.Space(12f);
+            GUILayout.Label("HUD Layout", headerStyle);
+            GUILayout.Label("Adjust installed module widgets. X/Y use the 1920x1080 HUD canvas; Save Garage persists positions.", bodyStyle);
+
+            HashSet<string> installed = playerProfile.InstalledModulesFor(selectedVehicle.id, false);
+            if (installed == null || installed.Count == 0)
+            {
+                GUILayout.Label("No installed modules yet.", bodyStyle);
+                return;
+            }
+
+            foreach (string moduleId in installed)
+            {
+                VectorSSModuleDefinition module = VectorSSCatalog.GetModule(moduleId);
+                if (module == null || module.widget == VectorSSModuleWidget.None)
+                {
+                    continue;
+                }
+
+                VectorSSModuleHudLayout layout = playerProfile.GetModuleLayout(selectedVehicle.id, module, true);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label(module.displayName, headerStyle);
+                float layoutX = layout.position.x;
+                float layoutY = layout.position.y;
+                float layoutScale = layout.scale;
+                DrawLayoutSlider("X", ref layoutX, 24f, 1700f);
+                DrawLayoutSlider("Y", ref layoutY, -900f, -72f);
+                DrawLayoutSlider("Scale", ref layoutScale, 0.65f, 1.25f);
+                if (!Mathf.Approximately(layoutX, layout.position.x) || !Mathf.Approximately(layoutY, layout.position.y) || !Mathf.Approximately(layoutScale, layout.scale))
+                {
+                    layout.position = new Vector2(layoutX, layoutY);
+                    layout.scale = layoutScale;
+                    VectorSSSaveSystem.Save(playerProfile);
+                }
+
+                bool visible = GUILayout.Toggle(layout.visible, "Visible");
+                if (visible != layout.visible)
+                {
+                    layout.visible = visible;
+                    VectorSSSaveSystem.Save(playerProfile);
+                }
+
+                if (GUILayout.Button("Reset " + module.displayName + " Layout", buttonStyle, GUILayout.Height(28f)))
+                {
+                    layout.ResetToDefinition(selectedVehicle.id, module);
+                    VectorSSSaveSystem.Save(playerProfile);
+                }
+
+                GUILayout.EndVertical();
+            }
+        }
+
+        private void DrawLayoutSlider(string label, ref float value, float min, float max)
+        {
+            GUILayout.Label(label + "  " + value.ToString("0.00"), bodyStyle);
+            float next = GUILayout.HorizontalSlider(value, min, max, GUILayout.Width(430f));
+            if (!Mathf.Approximately(next, value))
+            {
+                value = next;
+            }
+        }
+
+        private string SlotUsageText(VectorSSVehicleDefinition vehicle)
+        {
+            return "Slots  Sensor " + playerProfile.InstalledSlotCount(vehicle.id, VectorSSModuleSlot.Sensor) + "/" + vehicle.sensorSlots +
+                "   Control " + playerProfile.InstalledSlotCount(vehicle.id, VectorSSModuleSlot.Control) + "/" + vehicle.controlSlots +
+                "   Combat " + playerProfile.InstalledSlotCount(vehicle.id, VectorSSModuleSlot.Combat) + "/" + vehicle.combatSlots +
+                "   Utility " + playerProfile.InstalledSlotCount(vehicle.id, VectorSSModuleSlot.Utility) + "/" + vehicle.utilitySlots;
+        }
+
         private void StartRace()
         {
             ClearSession();
@@ -463,6 +612,7 @@ namespace GTX.Core
             resetPoint.SetParent(sessionRoot, true);
 
             activePlayer = CreatePlayerMachine(resetPoint, selectedVehicle);
+            activeModuleController = activePlayer.moduleController;
             activePlayer.root.transform.SetParent(sessionRoot, true);
             float rivalStartDistance = Mathf.Min(activeRoute.TotalLength * 0.16f, 76f);
             TrackPose rivalPose = activeRoute.PoseAtDistance(rivalStartDistance);
@@ -515,6 +665,12 @@ namespace GTX.Core
         {
             hasActivePlayer = false;
             activeRivalAi = null;
+            activeModuleController = null;
+            if (activeModuleHud != null)
+            {
+                activeModuleHud.Clear();
+            }
+
             if (sessionRoot != null)
             {
                 Destroy(sessionRoot.gameObject);
@@ -1233,17 +1389,19 @@ namespace GTX.Core
             SpinGuardController spinGuard = root.AddComponent<SpinGuardController>();
             FlowVisualController visuals = root.AddComponent<FlowVisualController>();
             GTXDrivingFlowBridge flowBridge = root.AddComponent<GTXDrivingFlowBridge>();
+            VectorSSVehicleModuleController moduleController = root.AddComponent<VectorSSVehicleModuleController>();
 
             sideSlam.Configure(body, flowState, effects);
             boostRam.Configure(body, flowState, effects);
             spinGuard.Configure(body, flowState, effects);
             flowBridge.Configure(vehicle, flowState, effects, boostRam, resetPoint);
+            moduleController.Configure(vehicle, body, flowState, effects, playerProfile, vehicleDefinition);
             float ramMultiplier = VectorSSProgressionUtility.RamMultiplier(vehicleDefinition, playerProfile);
             sideSlam.SetPowerMultiplier(ramMultiplier);
             boostRam.SetPowerMultiplier(ramMultiplier * (vehicleDefinition.isBike ? 1.18f : 1f));
             intensityMapper.enabled = true;
 
-            return new PlayerRig(root, body, tuning, vehicle, flowState, effects, sideSlam, boostRam, spinGuard, visuals, boostTrail);
+            return new PlayerRig(root, body, tuning, vehicle, flowState, effects, sideSlam, boostRam, spinGuard, visuals, boostTrail, moduleController);
         }
 
         private void CreateCarVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
@@ -1443,6 +1601,88 @@ namespace GTX.Core
             player.sideSlam.FeedbackRaised += hud.ShowCallout;
             player.boostRam.FeedbackRaised += hud.ShowCallout;
             player.spinGuard.FeedbackRaised += hud.ShowCallout;
+            if (player.moduleController != null)
+            {
+                player.moduleController.FeedbackRaised += hud.ShowCallout;
+                hud.SetModuleControlHints(player.moduleController.BuildControlHints());
+            }
+            else
+            {
+                hud.SetModuleControlHints(null);
+            }
+
+            hud.SetCoreHeatVisible(false);
+            ConfigureModuleHud(hud, player.moduleController);
+        }
+
+        private void ConfigureModuleHud(GTXRuntimeHUD hud, VectorSSVehicleModuleController moduleController)
+        {
+            if (hud == null || moduleController == null)
+            {
+                return;
+            }
+
+            if (activeModuleHud == null)
+            {
+                activeModuleHud = hud.GetComponent<VectorSSModuleHUD>();
+                if (activeModuleHud == null)
+                {
+                    activeModuleHud = hud.gameObject.AddComponent<VectorSSModuleHUD>();
+                }
+            }
+
+            activeModuleHud.Configure(hud.HudCanvas, BuildModuleWidgetStates(moduleController));
+            UpdateModuleHud();
+        }
+
+        private List<VectorSSModuleHUD.ModuleWidgetState> BuildModuleWidgetStates(VectorSSVehicleModuleController moduleController)
+        {
+            List<VectorSSModuleHUD.ModuleWidgetState> widgets = new List<VectorSSModuleHUD.ModuleWidgetState>();
+            if (moduleController == null)
+            {
+                return widgets;
+            }
+
+            IList<VectorSSModuleDefinition> modules = moduleController.InstalledModules;
+            for (int i = 0; i < modules.Count; i++)
+            {
+                VectorSSModuleDefinition module = modules[i];
+                if (module == null || module.widget == VectorSSModuleWidget.None)
+                {
+                    continue;
+                }
+
+                VectorSSModuleHudLayout layout = playerProfile.GetModuleLayout(selectedVehicle.id, module, true);
+                widgets.Add(new VectorSSModuleHUD.ModuleWidgetState
+                {
+                    moduleId = module.id,
+                    title = module.displayName,
+                    value = moduleController.GetWidgetValue(module.id),
+                    position = layout != null ? layout.position : module.defaultHudPosition,
+                    scale = layout != null ? layout.scale : module.defaultHudScale,
+                    visible = layout == null || layout.visible
+                });
+            }
+
+            return widgets;
+        }
+
+        private void UpdateModuleHud()
+        {
+            if (activeModuleHud == null || activeModuleController == null)
+            {
+                return;
+            }
+
+            IList<VectorSSModuleDefinition> modules = activeModuleController.InstalledModules;
+            for (int i = 0; i < modules.Count; i++)
+            {
+                VectorSSModuleDefinition module = modules[i];
+                if (module != null && module.widget != VectorSSModuleWidget.None)
+                {
+                    activeModuleHud.UpdateWidget(module.id, activeModuleController.GetWidgetValue(module.id), activeModuleController.GetWidgetNormalized(module.id));
+                }
+            }
         }
 
         private GameObject CreateOutlinedPrimitive(Transform parent, string name, PrimitiveType type, Vector3 localPosition, Quaternion localRotation, Vector3 localScale, Material material, float outlineMultiplier)
@@ -1727,8 +1967,9 @@ namespace GTX.Core
             public readonly SpinGuardController spinGuard;
             public readonly FlowVisualController visuals;
             public readonly Transform boostTrail;
+            public readonly VectorSSVehicleModuleController moduleController;
 
-            public PlayerRig(GameObject root, Rigidbody body, VehicleTuning tuning, VehicleController vehicle, FlowState flowState, RuntimeImpactEffects effects, SideSlamController sideSlam, BoostRamDetector boostRam, SpinGuardController spinGuard, FlowVisualController visuals, Transform boostTrail)
+            public PlayerRig(GameObject root, Rigidbody body, VehicleTuning tuning, VehicleController vehicle, FlowState flowState, RuntimeImpactEffects effects, SideSlamController sideSlam, BoostRamDetector boostRam, SpinGuardController spinGuard, FlowVisualController visuals, Transform boostTrail, VectorSSVehicleModuleController moduleController)
             {
                 this.root = root;
                 this.body = body;
@@ -1741,6 +1982,7 @@ namespace GTX.Core
                 this.spinGuard = spinGuard;
                 this.visuals = visuals;
                 this.boostTrail = boostTrail;
+                this.moduleController = moduleController;
             }
         }
     }

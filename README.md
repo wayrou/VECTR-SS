@@ -26,7 +26,8 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - Race rewards with completion, style/combat, and map bonus payouts.
 - Lightweight one-lap checkpoint objective with visible checkpoint gates and automatic finish through the start gate.
 - Simple route-following AI rival that drives the selected map while remaining a combat target.
-- Garage tuning sliders and upgrade purchases saved through PlayerPrefs.
+- Garage tuning sliders, upgrade purchases, module installs, and module HUD layouts saved through PlayerPrefs.
+- Cockpit module system with sensor, active-control, combat, and utility modules.
 - Procedural low-poly mesh kit for track ribbons, chamfered boxes, wedges, prisms, rounded rails, and bike/car visuals.
 - Additive UGUI menu prototype in `Assets/Scripts/UI/VectorSSMenuUI.cs` for later replacement of the current immediate-mode menu.
 
@@ -44,12 +45,21 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - `F`: boost
 - `Z`: side slam left / Razor side check left
 - `C`: side slam right / Razor side check right
-- `X`: spin guard / parry
+- `N`: spin guard / parry
 - `R`: reset car
 - `Tab`: legacy HUD garage/debug panel during race
 - Backquote `` ` `` or `\`: QUAC terminal
 - `F1`: controls overlay
 - `F3`: debug Flow panel
+
+Module controls only work when the matching module is installed:
+
+- `X`: Clutch Kick Assist
+- `V`: Boost Valve Lever Low / Medium / High
+- `[` / `]`: Brake Bias Dial rearward / forward
+- `G`: Differential Lock Switch
+- `B`: Armor Plate Deploy
+- `Left Alt`: Razor Snap Lean Module
 
 ## Maps
 
@@ -87,7 +97,20 @@ Purchasable upgrades include:
 - Lean Stabilizer I
 - Boost Tuck I
 
-Resources, purchased upgrades, selected map, selected vehicle, and tuning values persist with PlayerPrefs under the Vector SS 0.1.0 save prefix.
+Purchasable cockpit modules include:
+
+- Heat Gauge: adds a heat widget.
+- Clutch Kick Assist: adds a dedicated clutch kick input and cooldown widget.
+- Boost Valve Lever: adds Low / Medium / High boost pressure control and widget.
+- Brake Bias Dial: adds live front/rear brake balance control and widget.
+- Differential Lock Switch: adds a traction/ram stability toggle and widget.
+- Armor Plate Deploy: adds temporary impact defense and cooldown widget.
+- Snap Lean Module: Razor-only evasive lean module.
+- Rear Brake Slide Controller: Razor-only slide readout and rear slide improvement.
+
+Each vehicle has limited module slots. The garage Modules section lets you buy, install, uninstall, and reposition installed module widgets with X/Y/scale sliders. Heat remains internal unless the Heat Gauge is installed.
+
+Resources, purchased upgrades/modules, installed modules, selected map, selected vehicle, tuning values, and module widget layouts persist with PlayerPrefs under the Vector SS 0.1.0 save prefix.
 
 ## How To Run
 
@@ -118,6 +141,7 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 
 - Many internal identifiers still say GTX. The player-facing direction is Vector SS.
 - The current primary menu is immediate-mode GUI for speed of integration; the additive `VectorSSMenuUI` script is ready for a later UGUI swap.
+- Module HUD layout is slider-based rather than drag-and-drop; it proves persistence and customization but needs a richer editor.
 - Race completion now uses a lightweight checkpoint/lap state machine, but it still uses nearest-route projection rather than physical trigger volumes.
 - The AI rival is intentionally simple route-following physics, not a full opponent brain.
 - Razor uses four hidden WheelColliders for stability while rendering as a two-wheel bike; it is bike-like, not a true motorcycle sim.
@@ -131,7 +155,7 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 - Replace nearest-route checkpoint logic with physical trigger volumes and timing splits.
 - Add richer AI rival behavior: attacks, recovery, rubber-banding options, and difficulty presets.
 - Add wheel visual spin/suspension sync.
-- Expand Razor-specific moves: Boost Pierce, Snap Lean, and stronger near-miss effects.
+- Expand Razor-specific moves: Boost Pierce, deeper Snap Lean scoring, and stronger near-miss effects.
 - Add original hand-drawn PNG icons, decals, map cards, upgrade icons, and comic burst sprites.
 - Migrate remaining GTX identifiers to Vector SS where practical.
 - Build deterministic mod/lobby schemas before starting real multiplayer.

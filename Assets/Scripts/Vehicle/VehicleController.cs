@@ -39,6 +39,7 @@ namespace GTX.Vehicle
         public bool IsDrifting => drift.IsDrifting;
         public string Feedback => BuildFeedback();
         public float ClutchTransfer { get; private set; }
+        public float RuntimeBrakeBias { get; set; } = 0.5f;
 
         private Rigidbody body;
         private WheelCollider[] driveWheels;
@@ -261,14 +262,31 @@ namespace GTX.Vehicle
         private void ApplyBrakes()
         {
             float serviceBrake = CurrentInput.brake * tuning.brakeTorque;
+            float frontBrake = serviceBrake * Mathf.Lerp(0.82f, 1.24f, Mathf.Clamp01(RuntimeBrakeBias));
+            float rearBrake = serviceBrake * Mathf.Lerp(1.24f, 0.82f, Mathf.Clamp01(RuntimeBrakeBias));
             bool hasWheelBrakes = false;
-            for (int i = 0; i < allWheels.Length; i++)
+            if (frontLeft != null)
             {
-                if (allWheels[i] != null)
-                {
-                    hasWheelBrakes = true;
-                    allWheels[i].brakeTorque = serviceBrake;
-                }
+                hasWheelBrakes = true;
+                frontLeft.brakeTorque = frontBrake;
+            }
+
+            if (frontRight != null)
+            {
+                hasWheelBrakes = true;
+                frontRight.brakeTorque = frontBrake;
+            }
+
+            if (rearLeft != null)
+            {
+                hasWheelBrakes = true;
+                rearLeft.brakeTorque = rearBrake;
+            }
+
+            if (rearRight != null)
+            {
+                hasWheelBrakes = true;
+                rearRight.brakeTorque = rearBrake;
             }
 
             float handbrake = CurrentInput.handbrake ? tuning.handbrakeTorque : 0f;
