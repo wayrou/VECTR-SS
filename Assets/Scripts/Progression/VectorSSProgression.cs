@@ -361,7 +361,7 @@ namespace GTX.Progression
                 mapBonus = new VectorSSResources(8, 10, 38),
                 roadColor = new Color(0.18f, 0.19f, 0.20f, 1f),
                 groundColor = new Color(0.58f, 0.45f, 0.30f, 1f),
-                barrierColor = new Color(0.12f, 0.13f, 0.14f, 1f)
+                barrierColor = new Color(0.26f, 0.26f, 0.24f, 1f)
             }
         };
 

@@ -663,18 +663,23 @@ namespace GTX.Core
                     nodes = new[]
                     {
                         new Vector3(0f, 0.08f, 8f),
-                        new Vector3(0f, 0.08f, 74f),
-                        new Vector3(-42f, 1.85f, 128f),
-                        new Vector3(-104f, 0.08f, 116f),
-                        new Vector3(-132f, 0.08f, 36f),
-                        new Vector3(-84f, 0.08f, -34f),
-                        new Vector3(-8f, 0.08f, -66f),
-                        new Vector3(72f, 0.08f, -36f),
-                        new Vector3(126f, 0.08f, 32f),
-                        new Vector3(104f, 1.35f, 110f),
-                        new Vector3(44f, 0.08f, 152f)
+                        new Vector3(0f, 0.08f, 78f),
+                        new Vector3(-44f, 1.85f, 132f),
+                        new Vector3(-112f, 0.08f, 118f),
+                        new Vector3(-140f, 0.08f, 34f),
+                        new Vector3(-88f, 0.08f, -40f),
+                        new Vector3(-6f, 0.08f, -72f),
+                        new Vector3(78f, 0.08f, -40f),
+                        new Vector3(136f, 0.08f, 32f),
+                        new Vector3(112f, 1.35f, 114f),
+                        new Vector3(42f, 0.08f, 158f),
+                        new Vector3(124f, 0.08f, 162f),
+                        new Vector3(186f, 0.08f, 92f),
+                        new Vector3(168f, 0.08f, -10f),
+                        new Vector3(88f, 0.08f, -96f),
+                        new Vector3(-18f, 0.08f, -54f)
                     };
-                    nodeWidths = new[] { 18f, 17f, 16f, 20f, 18f, 19f, 22f, 18f, 17f, 16f, 18f };
+                    nodeWidths = new[] { 21f, 20f, 18f, 22f, 20f, 21f, 24f, 21f, 20f, 18f, 21f, 22f, 23f, 22f, 24f, 22f };
                     break;
                 default:
                     nodes = new[]
@@ -735,7 +740,7 @@ namespace GTX.Core
                 case VectorSSMapId.ScraplineYard:
                     return new Vector3(44f, -0.28f, 82f);
                 case VectorSSMapId.RubberRidge:
-                    return new Vector3(-4f, -0.28f, 42f);
+                    return new Vector3(18f, -0.28f, 34f);
                 default:
                     return new Vector3(36f, -0.28f, 98f);
             }
@@ -748,7 +753,7 @@ namespace GTX.Core
                 case VectorSSMapId.ScraplineYard:
                     return new Vector3(340f, 0.18f, 300f);
                 case VectorSSMapId.RubberRidge:
-                    return new Vector3(300f, 0.18f, 260f);
+                    return new Vector3(386f, 0.18f, 304f);
                 default:
                     return new Vector3(320f, 0.18f, 365f);
             }
