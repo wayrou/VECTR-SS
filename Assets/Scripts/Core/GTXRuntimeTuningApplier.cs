@@ -84,6 +84,7 @@ namespace GTX.Core
             tuning.driftExitHoldSeconds = baseline.driftExitHoldSeconds * Mathf.Lerp(1.08f, 0.88f, Mathf.InverseLerp(0.6f, 1.8f, profile.grip));
             tuning.driftLateralDamping = baseline.driftLateralDamping * Mathf.Lerp(0.9f, 1.18f, Mathf.InverseLerp(0.6f, 1.8f, profile.grip));
             tuning.driftHandbrakeEntryKick = baseline.driftHandbrakeEntryKick * Mathf.Lerp(1.12f, 0.92f, Mathf.InverseLerp(0.6f, 1.8f, profile.grip));
+            tuning.driftExitBoostForce = baseline.driftExitBoostForce * Mathf.Lerp(0.94f, 1.16f, Mathf.InverseLerp(0.6f, 1.8f, profile.grip));
 
             tuning.boostCapacity = baseline.boostCapacity * Mathf.Lerp(0.82f, 1.28f, Mathf.InverseLerp(0.4f, 1.8f, profile.boostPower));
             tuning.boostTorqueMultiplier = 1f + (baseline.boostTorqueMultiplier - 1f) * profile.boostPower * carClass.boostMultiplier;
@@ -140,6 +141,7 @@ namespace GTX.Core
             public readonly float driftExitHoldSeconds;
             public readonly float driftLateralDamping;
             public readonly float driftHandbrakeEntryKick;
+            public readonly float driftExitBoostForce;
             public readonly float boostCapacity;
             public readonly float boostTorqueMultiplier;
             public readonly float boostBurnPerSecond;
@@ -172,6 +174,7 @@ namespace GTX.Core
                 driftExitHoldSeconds = tuning.driftExitHoldSeconds;
                 driftLateralDamping = tuning.driftLateralDamping;
                 driftHandbrakeEntryKick = tuning.driftHandbrakeEntryKick;
+                driftExitBoostForce = tuning.driftExitBoostForce;
                 boostCapacity = tuning.boostCapacity;
                 boostTorqueMultiplier = tuning.boostTorqueMultiplier;
                 boostBurnPerSecond = tuning.boostBurnPerSecond;

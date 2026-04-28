@@ -406,6 +406,7 @@ namespace GTX.Vehicle
             tuning.driftExitRecovery = baseline.driftExitRecovery * (differentialLocked && HasModule(DifferentialLockId) ? 1.12f : 1f);
             tuning.driftExitYawDamping = baseline.driftExitYawDamping * (differentialLocked && HasModule(DifferentialLockId) ? 1.18f : 1f);
             tuning.driftExitHoldSeconds = baseline.driftExitHoldSeconds;
+            tuning.driftExitBoostForce = baseline.driftExitBoostForce * (HasModule(RearBrakeSlideId) ? 1.08f : 1f);
             tuning.highSpeedSteeringStability = baseline.highSpeedSteeringStability * (differentialLocked && HasModule(DifferentialLockId) ? 1.16f : 1f);
 
             if (vehicle != null)
@@ -477,6 +478,7 @@ namespace GTX.Vehicle
             public readonly float driftExitRecovery;
             public readonly float driftExitYawDamping;
             public readonly float driftExitHoldSeconds;
+            public readonly float driftExitBoostForce;
             public readonly float highSpeedSteeringStability;
             public readonly float bodyMass;
             public readonly float angularDrag;
@@ -498,6 +500,7 @@ namespace GTX.Vehicle
                 driftExitRecovery = tuning != null ? tuning.driftExitRecovery : 2.35f;
                 driftExitYawDamping = tuning != null ? tuning.driftExitYawDamping : 7.2f;
                 driftExitHoldSeconds = tuning != null ? tuning.driftExitHoldSeconds : 0.42f;
+                driftExitBoostForce = tuning != null ? tuning.driftExitBoostForce : 4.8f;
                 highSpeedSteeringStability = tuning != null ? tuning.highSpeedSteeringStability : 0.18f;
                 bodyMass = body != null ? body.mass : tuning != null ? tuning.mass : 1350f;
                 angularDrag = body != null ? body.angularDrag : 1.2f;

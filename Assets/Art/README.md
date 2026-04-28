@@ -2,6 +2,10 @@
 
 Vector SS should stay asset-light: mostly procedural low-poly geometry, flat colors, thick black outlines, and hand-drawn PNG overlays. This project was previously called GTX, so some legacy filenames and shaders still use that name.
 
+## VECTR Visual Pass
+
+The practical visual-pass guide lives at `Assets/VECTR/Docs/VECTR_StyleGuide.md`. Use it as the current source for visual pillars, palette, linework, vehicle/map/garage/HUD guidance, shader usage, prefab naming, and future asset priorities.
+
 ## Current Reference Direction
 
 The working reference direction is original anime rally model-kit energy:

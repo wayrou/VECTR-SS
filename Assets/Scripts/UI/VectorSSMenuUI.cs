@@ -695,6 +695,7 @@ namespace GTX.UI
                 vehicles.Add(new VehicleOption("strike", "Strike", "STRIKE CLASS", "Heavy contact platform.", 0.72f, 0.56f, 0.62f, false));
                 vehicles.Add(new VehicleOption("drift", "Drift", "DRIFT CLASS", "Fast yaw response and flow gain.", 0.62f, 0.82f, 0.58f, false));
                 vehicles.Add(new VehicleOption("volt", "Volt", "VOLT CLASS", "Boost-heavy build with heat risk.", 0.76f, 0.62f, 0.92f, false));
+                vehicles.Add(new VehicleOption("hauler", "Hauler", "PICKUP CLASS", "Stable utility truck with bed armor.", 0.64f, 0.68f, 0.6f, false));
             }
 
             if (upgrades.Count == 0)

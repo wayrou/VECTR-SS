@@ -20,6 +20,7 @@ namespace GTX.Core
         private Rigidbody body;
         private float previousShiftAge = 99f;
         private float nextSkidTime;
+        private float previousDriftExitBoostTimer;
         private bool wasGrounded = true;
         private float airborneTime;
 
@@ -77,6 +78,7 @@ namespace GTX.Core
 
             AwardShiftFlow();
             AwardDrivingFlow();
+            AwardDriftExitFlow();
             AwardLandingFlow();
         }
 
@@ -122,6 +124,19 @@ namespace GTX.Core
                     }
                 }
             }
+        }
+
+        private void AwardDriftExitFlow()
+        {
+            float exitTimer = vehicle.Drift.ExitBoostTimer;
+            if (exitTimer > previousDriftExitBoostTimer + 0.01f)
+            {
+                flowState.AddFlow(4.5f);
+                effects?.PlayBoostFlash(transform, 0.55f + flowState.Normalized * 0.25f);
+                effects?.PlaySpeedLines(transform, 0.48f + flowState.Normalized * 0.22f);
+            }
+
+            previousDriftExitBoostTimer = exitTimer;
         }
 
         private void AwardLandingFlow()

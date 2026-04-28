@@ -4,7 +4,9 @@ Shader "GTX/ToonCel"
     {
         _Color ("Base Color", Color) = (1,1,1,1)
         _ShadowColor ("Shadow Color", Color) = (0.1,0.1,0.12,1)
+        _HighlightColor ("Graphic Highlight", Color) = (1,1,1,1)
         _Steps ("Light Steps", Range(1, 5)) = 3
+        _RimThreshold ("Ink Rim Threshold", Range(0, 1)) = 0.82
     }
     SubShader
     {
@@ -31,17 +33,21 @@ Shader "GTX/ToonCel"
             {
                 float4 pos : SV_POSITION;
                 float3 worldNormal : TEXCOORD0;
+                float3 worldPos : TEXCOORD1;
             };
 
             fixed4 _Color;
             fixed4 _ShadowColor;
+            fixed4 _HighlightColor;
             float _Steps;
+            float _RimThreshold;
 
             v2f vert(appdata v)
             {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.worldNormal = UnityObjectToWorldNormal(v.normal);
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
@@ -52,7 +58,11 @@ Shader "GTX/ToonCel"
                 float lightAmount = saturate(dot(normal, lightDirection) * 0.5 + 0.5);
                 float steps = max(1.0, _Steps);
                 float cel = floor(lightAmount * steps) / steps;
-                fixed3 color = lerp(_ShadowColor.rgb, _Color.rgb * _LightColor0.rgb, cel);
+                float3 viewDirection = normalize(_WorldSpaceCameraPos.xyz - i.worldPos);
+                float rim = step(_RimThreshold, 1.0 - saturate(dot(normal, viewDirection)));
+                fixed3 lit = _Color.rgb * _LightColor0.rgb;
+                fixed3 color = lerp(_ShadowColor.rgb, lit, cel);
+                color = lerp(color, _HighlightColor.rgb, rim * 0.18);
                 return fixed4(color, _Color.a);
             }
             ENDCG

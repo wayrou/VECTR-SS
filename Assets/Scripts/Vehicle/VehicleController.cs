@@ -459,7 +459,8 @@ namespace GTX.Vehicle
             float entryGrip = Mathf.Min(tuning.handbrakeRearGrip, tuning.driftSideGrip);
             float driftGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.driftSideGrip, drift.DriftAmount);
             float rearGrip = CurrentInput.handbrake ? Mathf.Lerp(driftGrip, entryGrip, drift.EntryAmount) : driftGrip;
-            float frontGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.normalSideGrip * 1.06f, drift.CounterSteerAmount * drift.DriftAmount);
+            rearGrip = Mathf.Lerp(rearGrip, tuning.normalSideGrip * 0.9f, drift.CounterSteerAmount * drift.DriftAmount * 0.45f);
+            float frontGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.normalSideGrip * 1.18f, drift.CounterSteerAmount * drift.DriftAmount);
             SetSideGrip(frontLeft, frontGrip);
             SetSideGrip(frontRight, frontGrip);
             SetSideGrip(rearLeft, rearGrip);
@@ -486,6 +487,26 @@ namespace GTX.Vehicle
 
             ApplyLaunchAndCollisionRecovery(deltaTime);
             drift.ApplyArcadeAssist(tuning, body, CurrentInput, deltaTime);
+            ApplyDriftExitBoost();
+        }
+
+        private void ApplyDriftExitBoost()
+        {
+            if (tuning == null || body == null || !drift.SuccessfulExitThisFrame)
+            {
+                return;
+            }
+
+            Vector3 flatForward = transform.forward;
+            flatForward.y = 0f;
+            if (flatForward.sqrMagnitude < 0.001f)
+            {
+                return;
+            }
+
+            float speed01 = Mathf.Clamp01(SpeedMetersPerSecond / 34f);
+            float boostForce = tuning.driftExitBoostForce * Mathf.Lerp(0.72f, 1.12f, speed01);
+            body.AddForce(flatForward.normalized * boostForce, ForceMode.VelocityChange);
         }
 
         private void ApplyLaunchAndCollisionRecovery(float deltaTime)
@@ -596,7 +617,17 @@ namespace GTX.Vehicle
 
             if (drift.IsDrifting)
             {
+                if (drift.TurnInAmount > 0.55f)
+                {
+                    return "TIGHT DRIFT";
+                }
+
                 return drift.ClutchKickActive ? "CLUTCH KICK" : "DRIFT";
+            }
+
+            if (drift.ExitBoostTimer > 0f)
+            {
+                return "DRIFT EXIT BOOST";
             }
 
             if (boost.IsActive)

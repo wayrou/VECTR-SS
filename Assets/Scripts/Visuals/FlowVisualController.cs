@@ -11,6 +11,9 @@ namespace GTX.Visuals
         [SerializeField] private RuntimeImpactEffects effects;
         [SerializeField] private Transform boostTrail;
         [SerializeField] private float speedLineInterval = 0.16f;
+        [SerializeField] private Color boostTrailBaseColor = new Color(0.1f, 0.72f, 1f, 0.85f);
+        [SerializeField] private Color boostTrailHotColor = new Color(1f, 0.08f, 0.66f, 0.96f);
+        [SerializeField] private bool narrowBoostTrail;
 
         private Transform[] outlineTransforms = new Transform[0];
         private Vector3[] outlineBaseScales = new Vector3[0];
@@ -29,6 +32,13 @@ namespace GTX.Visuals
             }
 
             CaptureOutlines();
+        }
+
+        public void SetBoostTrailStyle(Color baseColor, Color hotColor, bool narrow)
+        {
+            boostTrailBaseColor = baseColor;
+            boostTrailHotColor = hotColor;
+            narrowBoostTrail = narrow;
         }
 
         private void Awake()
@@ -117,14 +127,14 @@ namespace GTX.Visuals
 
             float target = boosting ? 1f : Mathf.Clamp01(flow01 - 0.62f);
             boostTrail.gameObject.SetActive(target > 0.02f);
-            float length = Mathf.Lerp(1.1f, 3.8f, Mathf.Clamp01(target + flow01 * 0.35f));
-            float width = Mathf.Lerp(0.38f, 0.82f, flow01);
+            float length = Mathf.Lerp(1.1f, narrowBoostTrail ? 4.35f : 3.8f, Mathf.Clamp01(target + flow01 * 0.35f));
+            float width = narrowBoostTrail ? Mathf.Lerp(0.18f, 0.42f, flow01) : Mathf.Lerp(0.38f, 0.82f, flow01);
             boostTrail.localPosition = new Vector3(0f, 0.46f, -2.18f - length * 0.5f);
             boostTrail.localScale = new Vector3(width, length, width);
 
             if (boostTrailRenderer != null)
             {
-                Color color = Color.Lerp(new Color(0.1f, 0.72f, 1f, 0.85f), new Color(1f, 0.95f, 0.2f, 0.95f), flow01);
+                Color color = Color.Lerp(boostTrailBaseColor, boostTrailHotColor, flow01);
                 boostTrailRenderer.material.color = color;
             }
         }

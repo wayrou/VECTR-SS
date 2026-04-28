@@ -7,18 +7,28 @@ namespace GTX.UI
     [DisallowMultipleComponent]
     public sealed class VectorSSModuleHUD : MonoBehaviour
     {
-        private const float PanelWidth = 188f;
-        private const float PanelHeight = 52f;
-        private const float BarHeight = 5f;
-        private const float Padding = 8f;
+        private const float PanelWidth = 202f;
+        private const float PanelHeight = 64f;
+        private const float BarHeight = 8f;
+        private const float BorderThickness = 4f;
+        private const int BarSegmentCount = 12;
         private const string FontResourceName = "LegacyRuntime.ttf";
 
-        private static readonly Color PanelColor = new Color(0.02f, 0.025f, 0.03f, 0.82f);
-        private static readonly Color PanelEdgeColor = new Color(0.16f, 0.72f, 0.92f, 0.95f);
-        private static readonly Color TitleColor = new Color(0.72f, 0.86f, 0.9f, 1f);
-        private static readonly Color ValueColor = new Color(1f, 1f, 0.94f, 1f);
-        private static readonly Color BarBackColor = new Color(0.12f, 0.14f, 0.15f, 0.95f);
-        private static readonly Color BarFillColor = new Color(0.1f, 0.86f, 0.72f, 1f);
+        private static readonly Color PanelColor = new Color(0.012f, 0.014f, 0.016f, 0.96f);
+        private static readonly Color BezelColor = new Color(0.045f, 0.048f, 0.052f, 1f);
+        private static readonly Color InnerPlateColor = new Color(0.018f, 0.022f, 0.024f, 0.96f);
+        private static readonly Color BorderColor = new Color(0.005f, 0.006f, 0.007f, 1f);
+        private static readonly Color BracketColor = new Color(0.16f, 0.17f, 0.17f, 1f);
+        private static readonly Color ScrewColor = new Color(0.33f, 0.35f, 0.34f, 1f);
+        private static readonly Color ScrewSlotColor = new Color(0.05f, 0.055f, 0.055f, 1f);
+        private static readonly Color TitleColor = new Color(0.62f, 0.72f, 0.7f, 1f);
+        private static readonly Color ValueColor = new Color(0.96f, 1f, 0.88f, 1f);
+        private static readonly Color BarBackColor = new Color(0.035f, 0.039f, 0.04f, 1f);
+        private static readonly Color BarDeadColor = new Color(0.09f, 0.1f, 0.098f, 0.96f);
+        private static readonly Color ReadyColor = new Color(0.12f, 0.95f, 0.56f, 1f);
+        private static readonly Color WarningColor = new Color(1f, 0.36f, 0.08f, 1f);
+        private static readonly Color CautionColor = new Color(1f, 0.75f, 0.12f, 1f);
+        private static readonly Color LabelPlateColor = new Color(0.06f, 0.065f, 0.063f, 1f);
 
         [SerializeField] private Canvas targetCanvas;
 
@@ -170,42 +180,92 @@ namespace GTX.UI
             panelImage.color = PanelColor;
             panelImage.raycastTarget = false;
 
-            RectTransform edge = CreateImage("Edge", panelRect, PanelEdgeColor);
-            edge.anchorMin = new Vector2(0f, 0f);
-            edge.anchorMax = new Vector2(0f, 1f);
-            edge.pivot = new Vector2(0f, 0.5f);
-            edge.sizeDelta = new Vector2(3f, 0f);
-            edge.anchoredPosition = Vector2.zero;
+            RectTransform bezel = CreateImage("Black Bezel", panelRect, BezelColor);
+            Stretch(bezel, 3f, 3f, -3f, -3f);
 
-            Text titleText = CreateText("Title", panelRect, 11, FontStyle.Bold, TextAnchor.UpperLeft, TitleColor);
+            RectTransform innerPlate = CreateImage("Recessed Plate", panelRect, InnerPlateColor);
+            Stretch(innerPlate, 10f, 8f, -10f, -8f);
+
+            CreateBorder("Top Border", panelRect, 0f, PanelHeight - BorderThickness, PanelWidth, BorderThickness);
+            CreateBorder("Bottom Border", panelRect, 0f, 0f, PanelWidth, BorderThickness);
+            CreateBorder("Left Border", panelRect, 0f, 0f, BorderThickness, PanelHeight);
+            CreateBorder("Right Border", panelRect, PanelWidth - BorderThickness, 0f, BorderThickness, PanelHeight);
+
+            CreateBracket(panelRect, 12f, PanelHeight - 12f, true, true);
+            CreateBracket(panelRect, PanelWidth - 24f, PanelHeight - 12f, false, true);
+            CreateBracket(panelRect, 12f, 10f, true, false);
+            CreateBracket(panelRect, PanelWidth - 24f, 10f, false, false);
+
+            CreateScrew(panelRect, 8f, -8f);
+            CreateScrew(panelRect, PanelWidth - 16f, -8f);
+            CreateScrew(panelRect, 8f, -PanelHeight + 16f);
+            CreateScrew(panelRect, PanelWidth - 16f, -PanelHeight + 16f);
+
+            RectTransform titlePlate = CreateImage("Stamped Label Plate", panelRect, LabelPlateColor);
+            titlePlate.anchorMin = new Vector2(0f, 1f);
+            titlePlate.anchorMax = new Vector2(1f, 1f);
+            titlePlate.pivot = new Vector2(0f, 1f);
+            titlePlate.offsetMin = new Vector2(24f, -22f);
+            titlePlate.offsetMax = new Vector2(-38f, -8f);
+
+            RectTransform ledBezel = CreateImage("LED Bezel", panelRect, BorderColor);
+            ledBezel.anchorMin = new Vector2(1f, 1f);
+            ledBezel.anchorMax = new Vector2(1f, 1f);
+            ledBezel.pivot = new Vector2(1f, 1f);
+            ledBezel.sizeDelta = new Vector2(18f, 12f);
+            ledBezel.anchoredPosition = new Vector2(-14f, -9f);
+
+            RectTransform led = CreateImage("Status LED", ledBezel, ReadyColor);
+            Stretch(led, 3f, 3f, -3f, -3f);
+
+            Text titleText = CreateText("Title", panelRect, 10, FontStyle.Bold, TextAnchor.MiddleLeft, TitleColor);
             RectTransform titleRect = titleText.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 1f);
             titleRect.anchorMax = new Vector2(1f, 1f);
             titleRect.pivot = new Vector2(0f, 1f);
-            titleRect.offsetMin = new Vector2(Padding, -24f);
-            titleRect.offsetMax = new Vector2(-Padding, -5f);
+            titleRect.offsetMin = new Vector2(28f, -22f);
+            titleRect.offsetMax = new Vector2(-42f, -8f);
 
-            Text valueText = CreateText("Value", panelRect, 17, FontStyle.Bold, TextAnchor.MiddleLeft, ValueColor);
+            Text valueText = CreateText("Value", panelRect, 16, FontStyle.Bold, TextAnchor.MiddleLeft, ValueColor);
             RectTransform valueRect = valueText.rectTransform;
             valueRect.anchorMin = new Vector2(0f, 0f);
             valueRect.anchorMax = new Vector2(1f, 0f);
             valueRect.pivot = new Vector2(0f, 0f);
-            valueRect.offsetMin = new Vector2(Padding, 11f);
-            valueRect.offsetMax = new Vector2(-Padding, 33f);
+            valueRect.offsetMin = new Vector2(24f, 21f);
+            valueRect.offsetMax = new Vector2(-12f, 43f);
 
             RectTransform barBack = CreateImage("Bar Back", panelRect, BarBackColor);
             barBack.anchorMin = new Vector2(0f, 0f);
             barBack.anchorMax = new Vector2(1f, 0f);
             barBack.pivot = new Vector2(0f, 0f);
-            barBack.offsetMin = new Vector2(Padding, Padding);
-            barBack.offsetMax = new Vector2(-Padding, Padding + BarHeight);
+            barBack.offsetMin = new Vector2(24f, 10f);
+            barBack.offsetMax = new Vector2(-14f, 10f + BarHeight);
 
-            RectTransform barFill = CreateImage("Bar Fill", barBack, BarFillColor);
+            RectTransform barFill = CreateImage("Bar Fill", barBack, new Color(ReadyColor.r, ReadyColor.g, ReadyColor.b, 0.22f));
             barFill.anchorMin = new Vector2(0f, 0f);
             barFill.anchorMax = new Vector2(0f, 1f);
             barFill.pivot = new Vector2(0f, 0.5f);
             barFill.offsetMin = Vector2.zero;
             barFill.offsetMax = Vector2.zero;
+
+            List<Image> barSegments = new List<Image>(BarSegmentCount);
+            for (int i = 0; i < BarSegmentCount; i++)
+            {
+                RectTransform segment = CreateImage("Mechanical Segment " + (i + 1).ToString("00"), barBack, BarDeadColor);
+                segment.anchorMin = new Vector2((float)i / BarSegmentCount, 0f);
+                segment.anchorMax = new Vector2((float)(i + 1) / BarSegmentCount, 1f);
+                segment.pivot = new Vector2(0f, 0.5f);
+                segment.offsetMin = new Vector2(i == 0 ? 1f : 2f, 1f);
+                segment.offsetMax = new Vector2(i == BarSegmentCount - 1 ? -1f : -2f, -1f);
+                barSegments.Add(segment.GetComponent<Image>());
+            }
+
+            RectTransform statusRail = CreateImage("Lower Warning Rail", panelRect, ReadyColor);
+            statusRail.anchorMin = new Vector2(0f, 0f);
+            statusRail.anchorMax = new Vector2(1f, 0f);
+            statusRail.pivot = new Vector2(0f, 0f);
+            statusRail.offsetMin = new Vector2(24f, 5f);
+            statusRail.offsetMax = new Vector2(-14f, 7f);
 
             WidgetView view = new WidgetView();
             view.root = panelRect;
@@ -213,7 +273,64 @@ namespace GTX.UI
             view.valueText = valueText;
             view.barFill = barFill;
             view.barBack = barBack;
+            view.ledImage = led.GetComponent<Image>();
+            view.statusRailImage = statusRail.GetComponent<Image>();
+            view.barFillImage = barFill.GetComponent<Image>();
+            view.barSegments = barSegments;
             return view;
+        }
+
+        private RectTransform CreateBorder(string name, RectTransform parent, float x, float y, float width, float height)
+        {
+            RectTransform border = CreateImage(name, parent, BorderColor);
+            border.anchorMin = new Vector2(0f, 0f);
+            border.anchorMax = new Vector2(0f, 0f);
+            border.pivot = new Vector2(0f, 0f);
+            border.anchoredPosition = new Vector2(x, y);
+            border.sizeDelta = new Vector2(width, height);
+            return border;
+        }
+
+        private void CreateBracket(RectTransform parent, float x, float y, bool left, bool top)
+        {
+            RectTransform horizontal = CreateImage("Steel Bracket H", parent, BracketColor);
+            horizontal.anchorMin = new Vector2(0f, 0f);
+            horizontal.anchorMax = new Vector2(0f, 0f);
+            horizontal.pivot = new Vector2(0f, 0f);
+            horizontal.anchoredPosition = new Vector2(x, y);
+            horizontal.sizeDelta = new Vector2(12f, 3f);
+
+            RectTransform vertical = CreateImage("Steel Bracket V", parent, BracketColor);
+            vertical.anchorMin = new Vector2(0f, 0f);
+            vertical.anchorMax = new Vector2(0f, 0f);
+            vertical.pivot = new Vector2(0f, 0f);
+            vertical.anchoredPosition = new Vector2(left ? x : x + 9f, top ? y - 9f : y);
+            vertical.sizeDelta = new Vector2(3f, 12f);
+        }
+
+        private void CreateScrew(RectTransform parent, float x, float y)
+        {
+            RectTransform screw = CreateImage("Screw Head", parent, ScrewColor);
+            screw.anchorMin = new Vector2(0f, 1f);
+            screw.anchorMax = new Vector2(0f, 1f);
+            screw.pivot = new Vector2(0f, 1f);
+            screw.anchoredPosition = new Vector2(x, y);
+            screw.sizeDelta = new Vector2(8f, 8f);
+
+            RectTransform slot = CreateImage("Screw Slot", screw, ScrewSlotColor);
+            slot.anchorMin = new Vector2(0.5f, 0.5f);
+            slot.anchorMax = new Vector2(0.5f, 0.5f);
+            slot.pivot = new Vector2(0.5f, 0.5f);
+            slot.anchoredPosition = Vector2.zero;
+            slot.sizeDelta = new Vector2(6f, 1.5f);
+        }
+
+        private void Stretch(RectTransform rect, float left, float bottom, float right, float top)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(left, bottom);
+            rect.offsetMax = new Vector2(right, top);
         }
 
         private RectTransform CreateImage(string name, RectTransform parent, Color color)
@@ -239,7 +356,7 @@ namespace GTX.UI
             text.fontStyle = style;
             text.alignment = alignment;
             text.color = color;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
             text.raycastTarget = false;
             return text;
@@ -279,6 +396,10 @@ namespace GTX.UI
             public Text valueText;
             public RectTransform barBack;
             public RectTransform barFill;
+            public Image barFillImage;
+            public Image ledImage;
+            public Image statusRailImage;
+            public List<Image> barSegments;
 
             public void Apply(ModuleWidgetState state, Font activeFont)
             {
@@ -312,10 +433,60 @@ namespace GTX.UI
 
                 if (barFill != null && barBack != null)
                 {
-                    float availableWidth = barBack.rect.width > 0.01f ? barBack.rect.width : PanelWidth - (Padding * 2f);
-                    float width = Mathf.Max(0f, availableWidth * Mathf.Clamp01(normalized));
+                    float availableWidth = barBack.rect.width > 0.01f ? barBack.rect.width : PanelWidth - 38f;
+                    float clamped = Mathf.Clamp01(normalized);
+                    float width = Mathf.Max(0f, availableWidth * clamped);
                     barFill.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+                    Color statusColor = GetStatusColor(clamped);
+                    bool isWarning = clamped < 0.2f;
+
+                    if (barFillImage != null)
+                    {
+                        barFillImage.color = new Color(statusColor.r, statusColor.g, statusColor.b, 0.22f);
+                    }
+
+                    if (ledImage != null)
+                    {
+                        ledImage.color = statusColor;
+                    }
+
+                    if (statusRailImage != null)
+                    {
+                        statusRailImage.color = statusColor;
+                    }
+
+                    if (valueText != null)
+                    {
+                        valueText.color = isWarning ? new Color(1f, 0.82f, 0.68f, 1f) : ValueColor;
+                    }
+
+                    if (barSegments != null)
+                    {
+                        int activeSegments = Mathf.CeilToInt(clamped * barSegments.Count);
+                        for (int i = 0; i < barSegments.Count; i++)
+                        {
+                            if (barSegments[i] != null)
+                            {
+                                barSegments[i].color = i < activeSegments ? statusColor : BarDeadColor;
+                            }
+                        }
+                    }
                 }
+            }
+
+            private static Color GetStatusColor(float normalized)
+            {
+                if (normalized < 0.2f)
+                {
+                    return WarningColor;
+                }
+
+                if (normalized < 0.55f)
+                {
+                    return CautionColor;
+                }
+
+                return ReadyColor;
             }
         }
     }

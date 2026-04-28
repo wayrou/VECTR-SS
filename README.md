@@ -14,11 +14,12 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
   - Blackline Circuit: intro elevated highway/city circuit.
   - Scrapline Yard: wide industrial combat course with movable crates.
   - Rubber Ridge: canyon/hairpin drift course with a narrow Razor shortcut.
-- Four selectable vehicles:
+- Five selectable vehicles:
   - Hammer: Strike class heavy combat car.
   - Needle: Drift class technical handling car.
   - Surge: Volt class boost-focused car.
   - Vector SS-B "Razor": Bike class precision/near-miss vehicle.
+  - Vector SS-P "Hauler": Pickup class utility combat truck.
 - Existing manual driving remains: throttle, brake, steering, clutch, manual gears, handbrake/rear brake slide, boost, and reset.
 - Existing combat remains: side slam, boost ram, and spin guard.
 - Hidden Flow remains visual-first: speed lines, boost trail changes, skid ink, impact bursts, camera FOV, and outline pulse.
@@ -28,6 +29,7 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - Simple route-following AI rival that drives the selected map while remaining a combat target.
 - Garage tuning sliders, upgrade purchases, module installs, and module HUD layouts saved through PlayerPrefs.
 - Cockpit module system with sensor, active-control, combat, and utility modules.
+- VECTR visual pass: centralized style tokens, stronger rally/drift vehicle silhouettes, map-specific color identities, mechanical module HUD widgets, richer ink/spark/smoke VFX, and a practical style guide in `Assets/VECTR/Docs/VECTR_StyleGuide.md`.
 - Procedural low-poly mesh kit for track ribbons, chamfered boxes, wedges, prisms, rounded rails, and bike/car visuals.
 - Additive UGUI menu prototype in `Assets/Scripts/UI/VectorSSMenuUI.cs` for later replacement of the current immediate-mode menu.
 
@@ -73,6 +75,9 @@ Module controls only work when the matching module is installed:
 - Needle: lighter, faster steering, better drift/clutch-kick behavior, weaker contact.
 - Surge: stronger boost and acceleration under boost, higher heat/risk profile.
 - Razor: narrow bike-class vehicle with lower mass, bike-like lean visuals, fast steering, weak impact resistance, lower slam strength, stronger near-miss Flow gain, and access to tight routes.
+- Hauler: pickup-class truck with higher mass, strong contact stability, bed armor visuals, slower steering, and reliable exits.
+
+The current VECTR art pass gives Hammer a signal-red armored rally bruiser read, Needle a bone-white drift coupe silhouette, Surge an electric-cyan boost coupe identity, Razor an oil-gray/acid blade bike profile, and Hauler a safety-orange utility pickup profile.
 
 ## Resources And Garage
 
@@ -135,6 +140,7 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 - `Assets/Scripts/Terminal/` - local QUAC command overlay.
 - `Assets/Shaders/` - toon and inverted hull outline shaders.
 - `Assets/Art/` - low-art pipeline notes.
+- `Assets/VECTR/Docs/` - VECTR visual bible and style guide.
 - `Docs/` - customization, lobby, Loom, and QUAC direction notes.
 
 ## Known Issues
@@ -142,6 +148,7 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 - Many internal identifiers still say GTX. The player-facing direction is Vector SS.
 - The current primary menu is immediate-mode GUI for speed of integration; the additive `VectorSSMenuUI` script is ready for a later UGUI swap.
 - Module HUD layout is slider-based rather than drag-and-drop; it proves persistence and customization but needs a richer editor.
+- Visual assets are still mostly runtime-generated geometry and UI; authored hand-drawn PNG icons/decals/posters are still needed.
 - Race completion now uses a lightweight checkpoint/lap state machine, but it still uses nearest-route projection rather than physical trigger volumes.
 - The AI rival is intentionally simple route-following physics, not a full opponent brain.
 - Razor uses four hidden WheelColliders for stability while rendering as a two-wheel bike; it is bike-like, not a true motorcycle sim.

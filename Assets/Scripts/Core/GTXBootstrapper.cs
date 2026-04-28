@@ -47,9 +47,11 @@ namespace GTX.Core
         private float raceStartTime;
         private float bestRouteDistance;
         private float currentRouteDistance;
+        private float previousRouteDistance;
         private int currentLap;
         private int targetLaps = 1;
         private int nextCheckpointIndex;
+        private bool hasRouteProgress;
         private float nextRazorNearMissTime;
         private int combatScore;
         private Vector2 garageScroll;
@@ -82,6 +84,8 @@ namespace GTX.Core
         private Transform vehiclePreviewSpinRoot;
         private readonly List<Transform> mapPreviewSpinRoots = new List<Transform>();
         private static readonly float[] CheckpointFractions = { 0.25f, 0.5f, 0.75f };
+        private const float RaceGridDistance = 3f;
+        private const float RaceStartLineDistance = 22f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -169,41 +173,41 @@ namespace GTX.Core
 
         private void BuildMaterials()
         {
-            roadMaterial = CreateMaterial("GTX Warm Ink Asphalt", new Color(0.18f, 0.20f, 0.22f, 1f), true);
-            barrierMaterial = CreateMaterial("GTX Sunbleached Barrier", new Color(0.86f, 0.82f, 0.70f, 1f), true);
-            stripeMaterial = CreateMaterial("GTX Print Blue Stripe", new Color(0.04f, 0.42f, 0.83f, 1f), true);
-            playerMaterial = CreateMaterial("GTX Rally Shell White", new Color(0.94f, 0.90f, 0.78f, 1f), true);
-            playerAccentMaterial = CreateMaterial("GTX Safety Orange", new Color(1f, 0.34f, 0.05f, 1f), true);
-            playerSecondaryMaterial = CreateMaterial("GTX Package Blue", new Color(0.03f, 0.24f, 0.72f, 1f), true);
-            glassMaterial = CreateMaterial("GTX Painted Glass Blue", new Color(0.45f, 0.74f, 0.92f, 1f), true);
-            rivalMaterial = CreateMaterial("GTX Rival Lime Rally", new Color(0.62f, 0.82f, 0.12f, 1f), true);
-            wheelMaterial = CreateMaterial("GTX Wheel Charcoal", new Color(0.045f, 0.05f, 0.055f, 1f), true);
-            outlineMaterial = CreateOutlineMaterial("GTX Inverted Hull Ink", new Color(0.006f, 0.009f, 0.02f, 1f));
-            inkMaterial = CreateMaterial("GTX Solid Ink Navy", new Color(0.006f, 0.009f, 0.02f, 1f), false);
-            boostTrailMaterial = CreateMaterial("GTX Cyan Boost Print", new Color(0.08f, 0.78f, 1f, 0.92f), false);
-            launchSmokeMaterial = CreateParticleMaterial("GTX Launch Dust Smoke", new Color(0.56f, 0.52f, 0.43f, 0.46f));
-            trackMarkerMaterial = CreateMaterial("GTX Track Marker Orange", new Color(1f, 0.44f, 0.08f, 1f), true);
-            trackMarkerBlueMaterial = CreateMaterial("GTX Track Marker Blue", new Color(0.05f, 0.42f, 0.96f, 1f), true);
-            desertMaterial = CreateMaterial("GTX Desert Board Sand", new Color(0.80f, 0.65f, 0.42f, 1f), true);
-            pitFloorMaterial = CreateMaterial("GTX Pit Mat Bluegray", new Color(0.24f, 0.31f, 0.36f, 1f), true);
-            pitPropMaterial = CreateMaterial("GTX Pit Prop Cream", new Color(0.92f, 0.84f, 0.62f, 1f), true);
+            roadMaterial = CreateMaterial("VECTR Asphalt Navy Cel", VectrStyleTokens.AsphaltNavy, true);
+            barrierMaterial = CreateMaterial("VECTR Bone Concrete Barrier", VectrStyleTokens.BoneWhite, true);
+            stripeMaterial = CreateMaterial("VECTR Electric Route Stripe", VectrStyleTokens.ElectricCyan, true);
+            playerMaterial = CreateMaterial("VECTR Vehicle Body Paint", VectrStyleTokens.VehicleBody(VectorSSVehicleId.Hammer), true);
+            playerAccentMaterial = CreateMaterial("VECTR Vehicle Accent Paint", VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Hammer), true);
+            playerSecondaryMaterial = CreateMaterial("VECTR Vehicle Secondary Paint", VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Hammer), true);
+            glassMaterial = CreateMaterial("VECTR Smoked Rally Glass", new Color(0.36f, 0.82f, 0.92f, 1f), true);
+            rivalMaterial = CreateMaterial("VECTR Rival Acid Dummy", VectrStyleTokens.AcidYellowGreen, true);
+            wheelMaterial = CreateMaterial("VECTR Rubber Tire Paint", VectrStyleTokens.RubberBlack, true);
+            outlineMaterial = CreateOutlineMaterial("VECTR Heavy Blackline Ink", VectrStyleTokens.InkBlack);
+            inkMaterial = CreateMaterial("VECTR Ink Black Solid", VectrStyleTokens.InkBlack, false);
+            boostTrailMaterial = CreateMaterial("VECTR Boost Neon Blade", VectrStyleTokens.WithAlpha(VectrStyleTokens.ElectricCyan, 0.92f), false);
+            launchSmokeMaterial = CreateParticleMaterial("VECTR Dust And Tire Smoke", new Color(0.45f, 0.43f, 0.36f, 0.48f));
+            trackMarkerMaterial = CreateMaterial("VECTR Warning Orange Marker", VectrStyleTokens.SafetyOrange, true);
+            trackMarkerBlueMaterial = CreateMaterial("VECTR Cyan Module Marker", VectrStyleTokens.ElectricCyan, true);
+            desertMaterial = CreateMaterial("VECTR Track Ground Base", VectrStyleTokens.WarmConcreteGray, true);
+            pitFloorMaterial = CreateMaterial("VECTR Garage Oil Concrete", VectrStyleTokens.OilGray, true);
+            pitPropMaterial = CreateMaterial("VECTR Garage Bone Panels", VectrStyleTokens.BoneWhite, true);
         }
 
         private void BuildLighting()
         {
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.82f, 0.88f, 0.92f, 1f);
-            RenderSettings.ambientEquatorColor = new Color(0.62f, 0.58f, 0.49f, 1f);
-            RenderSettings.ambientGroundColor = new Color(0.36f, 0.29f, 0.21f, 1f);
+            RenderSettings.ambientSkyColor = new Color(0.66f, 0.76f, 0.82f, 1f);
+            RenderSettings.ambientEquatorColor = VectrStyleTokens.WarmConcreteGray;
+            RenderSettings.ambientGroundColor = VectrStyleTokens.OilGray;
             RenderSettings.fog = true;
-            RenderSettings.fogColor = new Color(0.78f, 0.83f, 0.82f, 1f);
-            RenderSettings.fogDensity = 0.0045f;
+            RenderSettings.fogColor = new Color(0.48f, 0.56f, 0.58f, 1f);
+            RenderSettings.fogDensity = 0.0056f;
 
-            GameObject lightObject = new GameObject("GTX Hard Toon Sun");
+            GameObject lightObject = new GameObject("VECTR Hard Toon Sun");
             Light sun = lightObject.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.intensity = 1.48f;
-            sun.color = new Color(1f, 0.92f, 0.74f, 1f);
+            sun.intensity = 1.58f;
+            sun.color = new Color(1f, 0.92f, 0.78f, 1f);
             lightObject.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
 
@@ -414,13 +418,15 @@ namespace GTX.Core
             DrawMenuBackdrop();
             GUILayout.BeginArea(new Rect(44f, 40f, Mathf.Min(760f, Screen.width - 88f), Screen.height - 80f), panelStyle);
             menuScroll = GUILayout.BeginScrollView(menuScroll, scrollStyle);
-            GUILayout.Label("Garage", headerStyle);
-            GUILayout.Label(playerProfile.resources.ToString(), headerStyle);
-            GUILayout.Label("Current vehicle: " + selectedVehicle.fullName, bodyStyle);
+            GUILayout.Label("VECTR BUILD BAY", titleStyle);
+            GUILayout.Label("[METAL] " + playerProfile.resources.metal + "    [PLASTIC] " + playerProfile.resources.plastic + "    [RUBBER] " + playerProfile.resources.rubber, headerStyle);
+            GUILayout.Label("Tabs: BUILD / MODULES / TUNING / DASHGRID", smallStyle);
+            GUILayout.Label("Current machine: " + selectedVehicle.fullName, bodyStyle);
             GUILayout.Label("Controller focus: " + GarageFocusLabel(menuFocusIndex) + "    D-pad up/down select    left/right adjust    Circle activate    X back", smallStyle);
             GUILayout.Space(8f);
 
             garageScroll = GUILayout.BeginScrollView(garageScroll, scrollStyle, GUILayout.Height(Mathf.Min(520f, Screen.height - 250f)));
+            GUILayout.Label("TUNING", headerStyle);
             DrawTuningSlider("Steering Sensitivity", ref playerProfile.tuning.steering, 0.45f, 1.85f);
             DrawTuningSlider("Brake Bias / Power", ref playerProfile.tuning.brakeBias, 0.45f, 1.85f);
             DrawTuningSlider("Drift Grip", ref playerProfile.tuning.driftGrip, 0.45f, 1.85f);
@@ -439,14 +445,14 @@ namespace GTX.Core
             }
 
             GUILayout.Space(12f);
-            GUILayout.Label("Upgrades", headerStyle);
+            GUILayout.Label("BUILD UPGRADES", headerStyle);
             for (int i = 0; i < VectorSSCatalog.Upgrades.Length; i++)
             {
                 DrawUpgrade(VectorSSCatalog.Upgrades[i]);
             }
 
             GUILayout.Space(12f);
-            GUILayout.Label("Modules", headerStyle);
+            GUILayout.Label("COCKPIT MODULES", headerStyle);
             GUILayout.Label(SlotUsageText(selectedVehicle), bodyStyle);
             if (!string.IsNullOrEmpty(garageMessage))
             {
@@ -462,12 +468,12 @@ namespace GTX.Core
 
             GUILayout.EndScrollView();
 
-            if (GUILayout.Button("Save Garage", buttonStyle, GUILayout.Height(36f)))
+            if (GUILayout.Button("LOCK GARAGE", buttonStyle, GUILayout.Height(36f)))
             {
                 VectorSSSaveSystem.Save(playerProfile);
             }
 
-            if (GUILayout.Button("Race Again", buttonStyle, GUILayout.Height(42f)))
+            if (GUILayout.Button("ROLL OUT", buttonStyle, GUILayout.Height(42f)))
             {
                 VectorSSSaveSystem.Save(playerProfile);
                 screen = VectorSSScreen.MapSelect;
@@ -526,6 +532,113 @@ namespace GTX.Core
             }
             GUILayout.Label("Return through START after CP3.", bodyStyle);
             GUILayout.EndArea();
+
+            float minimapSize = Mathf.Clamp(Screen.height * 0.22f, 174f, 230f);
+            DrawRaceMinimap(new Rect(Screen.width - minimapSize - 40f, top.yMax + 12f, minimapSize, minimapSize));
+        }
+
+        private void DrawRaceMinimap(Rect rect)
+        {
+            if (activeRoute.samples == null || activeRoute.samples.Length < 2)
+            {
+                return;
+            }
+
+            GUI.Box(rect, string.Empty, panelStyle);
+            GUI.Label(new Rect(rect.x + 12f, rect.y + 8f, rect.width - 24f, 22f), "MINIMAP", smallStyle);
+            Rect mapRect = new Rect(rect.x + 14f, rect.y + 34f, rect.width - 28f, rect.height - 48f);
+            GUI.color = VectrStyleTokens.WithAlpha(VectrStyleTokens.InkBlack, 0.46f);
+            GUI.DrawTexture(mapRect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            Vector2 min;
+            Vector2 max;
+            GetRouteBoundsXZ(activeRoute.samples, out min, out max);
+            float scale = MinimapScale(mapRect, min, max);
+
+            for (int i = 0; i < activeRoute.samples.Length - 1; i++)
+            {
+                Vector2 a = WorldToMinimap(activeRoute.samples[i], mapRect, min, max, scale);
+                Vector2 b = WorldToMinimap(activeRoute.samples[i + 1], mapRect, min, max, scale);
+                DrawGuiLine(a, b, VectrStyleTokens.WithAlpha(VectrStyleTokens.InkBlack, 0.95f), 6f);
+                DrawGuiLine(a, b, VectrStyleTokens.WithAlpha(VectrStyleTokens.MapAccent(selectedMap.id), 0.92f), 3f);
+            }
+
+            Vector2 start = WorldToMinimap(activeRoute.PoseAtDistance(RaceStartLineDistance).position, mapRect, min, max, scale);
+            DrawMinimapBlip(start, VectrStyleTokens.HotMagenta, 7f);
+
+            float markerDistance = nextCheckpointIndex < CheckpointFractions.Length
+                ? activeRoute.TotalLength * CheckpointFractions[nextCheckpointIndex]
+                : RaceStartLineDistance;
+            Vector2 checkpoint = WorldToMinimap(activeRoute.PoseAtDistance(markerDistance).position, mapRect, min, max, scale);
+            DrawMinimapBlip(checkpoint, VectrStyleTokens.SafetyOrange, 8f);
+
+            if (activeRivalAi != null)
+            {
+                Vector2 rival = WorldToMinimap(activeRivalAi.transform.position, mapRect, min, max, scale);
+                DrawMinimapBlip(rival, VectrStyleTokens.SignalRed, 6f);
+            }
+
+            if (hasActivePlayer && activePlayer.root != null)
+            {
+                Transform playerTransform = activePlayer.root.transform;
+                Vector2 player = WorldToMinimap(playerTransform.position, mapRect, min, max, scale);
+                Vector2 nose = WorldToMinimap(playerTransform.position + playerTransform.forward * 8f, mapRect, min, max, scale);
+                DrawMinimapBlip(player, VectrStyleTokens.BoneWhite, 8f);
+                DrawGuiLine(player, nose, VectrStyleTokens.BoneWhite, 3f);
+            }
+        }
+
+        private static void GetRouteBoundsXZ(Vector3[] samples, out Vector2 min, out Vector2 max)
+        {
+            min = new Vector2(float.MaxValue, float.MaxValue);
+            max = new Vector2(float.MinValue, float.MinValue);
+            for (int i = 0; i < samples.Length; i++)
+            {
+                Vector2 point = new Vector2(samples[i].x, samples[i].z);
+                min = Vector2.Min(min, point);
+                max = Vector2.Max(max, point);
+            }
+        }
+
+        private static float MinimapScale(Rect rect, Vector2 min, Vector2 max)
+        {
+            Vector2 size = max - min;
+            float width = Mathf.Max(1f, size.x);
+            float height = Mathf.Max(1f, size.y);
+            return Mathf.Min(rect.width / width, rect.height / height) * 0.86f;
+        }
+
+        private static Vector2 WorldToMinimap(Vector3 world, Rect rect, Vector2 min, Vector2 max, float scale)
+        {
+            Vector2 center = (min + max) * 0.5f;
+            Vector2 offset = new Vector2(world.x - center.x, world.z - center.y) * scale;
+            return rect.center + new Vector2(offset.x, -offset.y);
+        }
+
+        private static void DrawMinimapBlip(Vector2 position, Color color, float size)
+        {
+            Color previous = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(position.x - size * 0.5f, position.y - size * 0.5f, size, size), Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+
+        private static void DrawGuiLine(Vector2 start, Vector2 end, Color color, float width)
+        {
+            Vector2 delta = end - start;
+            if (delta.sqrMagnitude < 0.01f)
+            {
+                return;
+            }
+
+            Matrix4x4 previousMatrix = GUI.matrix;
+            Color previousColor = GUI.color;
+            GUI.color = color;
+            GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, start);
+            GUI.DrawTexture(new Rect(start.x, start.y - width * 0.5f, delta.magnitude, width), Texture2D.whiteTexture);
+            GUI.matrix = previousMatrix;
+            GUI.color = previousColor;
         }
 
         private void DrawPauseMenu()
@@ -1044,8 +1157,8 @@ namespace GTX.Core
         private void DrawModuleLayoutEditor()
         {
             GUILayout.Space(12f);
-            GUILayout.Label("HUD Layout", headerStyle);
-            GUILayout.Label("Adjust installed module widgets. X/Y use the 1920x1080 HUD canvas; Save Garage persists positions.", bodyStyle);
+            GUILayout.Label("DASHGRID HUD LAYOUT", headerStyle);
+            GUILayout.Label("Arrange installed cockpit hardware. X/Y use the 1920x1080 dash canvas; LOCK GARAGE persists positions.", bodyStyle);
 
             HashSet<string> installed = playerProfile.InstalledModulesFor(selectedVehicle.id, false);
             if (installed == null || installed.Count == 0)
@@ -1085,7 +1198,7 @@ namespace GTX.Core
                     VectorSSSaveSystem.Save(playerProfile);
                 }
 
-                if (GUILayout.Button("Reset " + module.displayName + " Layout", buttonStyle, GUILayout.Height(28f)))
+                if (GUILayout.Button("REWIRE " + module.displayName, buttonStyle, GUILayout.Height(28f)))
                 {
                     layout.ResetToDefinition(selectedVehicle.id, module);
                     VectorSSSaveSystem.Save(playerProfile);
@@ -1126,7 +1239,7 @@ namespace GTX.Core
             Transform trackRoot = new GameObject("Vector SS Runtime Test Track").transform;
             trackRoot.SetParent(sessionRoot, false);
             activeRoute = BuildTrack(trackRoot, selectedMap);
-            TrackPose resetPose = activeRoute.PoseAtDistance(3f);
+            TrackPose resetPose = activeRoute.PoseAtDistance(RaceGridDistance);
             Transform resetPoint = CreateResetPoint(resetPose.position + Vector3.up * 0.28f, resetPose.rotation);
             resetPoint.SetParent(sessionRoot, true);
 
@@ -1148,6 +1261,7 @@ namespace GTX.Core
             ConfigureHud(activePlayer);
             SetRaceHudVisible(true);
             activePlayer.visuals.Configure(activePlayer.vehicle, activePlayer.flowState, activePlayer.effects, activePlayer.boostTrail);
+            activePlayer.visuals.SetBoostTrailStyle(VectrStyleTokens.WithAlpha(VectrStyleTokens.BoostTrail(selectedVehicle.id), 0.86f), VectrStyleTokens.WithAlpha(selectedVehicle.isBike ? VectrStyleTokens.AcidYellowGreen : VectrStyleTokens.HotMagenta, 0.96f), selectedVehicle.isBike);
             camera.GetComponent<GTXCameraRig>().Configure(activePlayer.root.transform, activePlayer.body, activePlayer.flowState);
             activePlayer.sideSlam.FeedbackRaised += delegate { combatScore += selectedVehicle.isBike ? 1 : 4; };
             activePlayer.boostRam.FeedbackRaised += delegate { combatScore += selectedVehicle.isBike ? 2 : 8; };
@@ -1155,10 +1269,12 @@ namespace GTX.Core
             hasActivePlayer = true;
             combatScore = 0;
             bestRouteDistance = 0f;
-            currentRouteDistance = 0f;
+            currentRouteDistance = activeRoute.DistanceAlongRoute(resetPose.position);
+            previousRouteDistance = currentRouteDistance;
             currentLap = 0;
             targetLaps = Mathf.Max(1, selectedMap.lapCount);
             nextCheckpointIndex = 0;
+            hasRouteProgress = true;
             raceStartTime = Time.time;
             nextRazorNearMissTime = 0f;
             racePaused = false;
@@ -1310,11 +1426,31 @@ namespace GTX.Core
                 return;
             }
 
+            if (activeRoute.TotalLength <= 0.01f)
+            {
+                return;
+            }
+
             float distance = activeRoute.DistanceAlongRoute(activePlayer.root.transform.position);
+            if (!hasRouteProgress)
+            {
+                currentRouteDistance = distance;
+                previousRouteDistance = distance;
+                hasRouteProgress = true;
+                return;
+            }
+
+            float forwardDelta = ForwardRouteDelta(previousRouteDistance, distance, activeRoute.TotalLength);
+            bool crossedStartLine = CrossedRouteDistance(previousRouteDistance, distance, RaceStartLineDistance, activeRoute.TotalLength, forwardDelta);
             currentRouteDistance = distance;
-            bestRouteDistance = Mathf.Max(bestRouteDistance, distance);
+            previousRouteDistance = distance;
+            if (forwardDelta > 0f)
+            {
+                bestRouteDistance = Mathf.Min(activeRoute.TotalLength + 60f, bestRouteDistance + forwardDelta);
+            }
+
             UpdateCheckpointProgress();
-            if (CanCompleteLap(distance))
+            if (CanCompleteLap(crossedStartLine))
             {
                 currentLap++;
                 if (currentLap >= targetLaps)
@@ -1323,7 +1459,7 @@ namespace GTX.Core
                     return;
                 }
 
-                bestRouteDistance = 0f;
+                bestRouteDistance = Mathf.Min(DistancePastStartLine(distance, activeRoute.TotalLength), activeRoute.TotalLength * 0.12f);
                 nextCheckpointIndex = 0;
             }
         }
@@ -1343,7 +1479,7 @@ namespace GTX.Core
             }
         }
 
-        private bool CanCompleteLap(float distance)
+        private bool CanCompleteLap(bool crossedStartLine)
         {
             if (activeRoute.TotalLength <= 0.01f || Time.time - raceStartTime < 10f)
             {
@@ -1351,9 +1487,51 @@ namespace GTX.Core
             }
 
             bool allCheckpointsCleared = nextCheckpointIndex >= CheckpointFractions.Length;
-            bool hasRunMostOfLap = bestRouteDistance > activeRoute.TotalLength * 0.86f;
-            bool backAtStart = distance < 38f || distance > activeRoute.TotalLength - 18f;
-            return allCheckpointsCleared && hasRunMostOfLap && backAtStart;
+            bool hasRunFullLoop = bestRouteDistance >= activeRoute.TotalLength * 0.96f;
+            return allCheckpointsCleared && hasRunFullLoop && crossedStartLine;
+        }
+
+        private static float ForwardRouteDelta(float previousDistance, float currentDistance, float routeLength)
+        {
+            if (routeLength <= 0.01f)
+            {
+                return 0f;
+            }
+
+            float delta = currentDistance - previousDistance;
+            if (delta < -routeLength * 0.5f)
+            {
+                delta += routeLength;
+            }
+            else if (delta > routeLength * 0.5f)
+            {
+                delta -= routeLength;
+            }
+
+            return delta;
+        }
+
+        private static bool CrossedRouteDistance(float previousDistance, float currentDistance, float markerDistance, float routeLength, float forwardDelta)
+        {
+            if (routeLength <= 0.01f || forwardDelta <= 0.01f)
+            {
+                return false;
+            }
+
+            float marker = Mathf.Repeat(markerDistance, routeLength);
+            float previous = Mathf.Repeat(previousDistance, routeLength);
+            float current = Mathf.Repeat(currentDistance, routeLength);
+            if (previous <= current)
+            {
+                return previous < marker && current >= marker;
+            }
+
+            return marker > previous || marker <= current;
+        }
+
+        private static float DistancePastStartLine(float distance, float routeLength)
+        {
+            return routeLength <= 0.01f ? 0f : Mathf.Repeat(distance - RaceStartLineDistance, routeLength);
         }
 
         private void UpdateRazorNearMissFlow()
@@ -1399,6 +1577,9 @@ namespace GTX.Core
             SetMaterialColor(roadMaterial, map.roadColor);
             SetMaterialColor(desertMaterial, map.groundColor);
             SetMaterialColor(barrierMaterial, map.barrierColor);
+            SetMaterialColor(stripeMaterial, VectrStyleTokens.MapAccent(map.id));
+            SetMaterialColor(trackMarkerMaterial, VectrStyleTokens.MapWarning(map.id));
+            SetMaterialColor(trackMarkerBlueMaterial, VectrStyleTokens.MapAccent(map.id));
         }
 
         private void ApplyVehiclePalette(VectorSSVehicleDefinition vehicle)
@@ -1406,6 +1587,11 @@ namespace GTX.Core
             SetMaterialColor(playerMaterial, vehicle.bodyColor);
             SetMaterialColor(playerAccentMaterial, vehicle.accentColor);
             SetMaterialColor(playerSecondaryMaterial, vehicle.secondaryColor);
+            SetMaterialColor(boostTrailMaterial, VectrStyleTokens.WithAlpha(VectrStyleTokens.BoostTrail(vehicle.id), 0.93f));
+            Color glassColor = vehicle.id == VectorSSVehicleId.Razor
+                ? Color.Lerp(VectrStyleTokens.ElectricCyan, VectrStyleTokens.InkBlack, 0.35f)
+                : Color.Lerp(VectrStyleTokens.VehicleSecondary(vehicle.id), VectrStyleTokens.BoneWhite, 0.28f);
+            SetMaterialColor(glassMaterial, glassColor);
         }
 
         private static void SetMaterialColor(Material material, Color color)
@@ -1427,7 +1613,7 @@ namespace GTX.Core
 
             if (material.HasProperty("_ShadowColor"))
             {
-                material.SetColor("_ShadowColor", Color.Lerp(color, new Color(0.02f, 0.025f, 0.04f, color.a), 0.46f));
+                material.SetColor("_ShadowColor", VectrStyleTokens.ShadowFor(color));
             }
         }
 
@@ -1438,13 +1624,13 @@ namespace GTX.Core
                 return;
             }
 
-            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
-            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 0.84f, 0.32f, 1f) } };
-            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true, normal = { textColor = Color.white } };
+            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, normal = { textColor = VectrStyleTokens.BoneWhite } };
+            headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, normal = { textColor = VectrStyleTokens.ElectricCyan } };
+            bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true, normal = { textColor = VectrStyleTokens.BoneWhite } };
             smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, normal = { textColor = new Color(0.78f, 0.9f, 0.96f, 1f) } };
             panelStyle = new GUIStyle(GUI.skin.box);
             panelTexture = new Texture2D(1, 1);
-            panelTexture.SetPixel(0, 0, new Color(0.015f, 0.02f, 0.045f, 0.94f));
+            panelTexture.SetPixel(0, 0, VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.95f));
             panelTexture.Apply();
             panelStyle.normal.background = panelTexture;
             panelStyle.normal.textColor = Color.white;
@@ -1453,10 +1639,10 @@ namespace GTX.Core
             scrollStyle.normal.background = panelTexture;
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 15, fontStyle = FontStyle.Bold };
             cardTexture = new Texture2D(1, 1);
-            cardTexture.SetPixel(0, 0, new Color(0.055f, 0.075f, 0.11f, 0.92f));
+            cardTexture.SetPixel(0, 0, VectrStyleTokens.WithAlpha(VectrStyleTokens.OilGray, 0.94f));
             cardTexture.Apply();
             focusTexture = new Texture2D(1, 1);
-            focusTexture.SetPixel(0, 0, new Color(0.98f, 0.34f, 0.08f, 0.96f));
+            focusTexture.SetPixel(0, 0, VectrStyleTokens.WithAlpha(VectrStyleTokens.SafetyOrange, 0.98f));
             focusTexture.Apply();
             cardStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             cardStyle.normal.background = cardTexture;
@@ -1610,7 +1796,7 @@ namespace GTX.Core
             LowPolyMeshFactory.CreateTrackRibbon("Vector SS " + map.displayName + " Surface", root, route.samples, route.widths, roadMaterial, true);
             CreateRouteStripe(root, route);
             CreateRouteBarriers(root, route);
-            CreateStartGate(root, route.PoseAtDistance(22f));
+            CreateStartGate(root, route.PoseAtDistance(RaceStartLineDistance));
             CreateCheckpointGates(root, route);
             CreateTrackMarkers(root, route);
             CreatePitDiorama(root, route);
@@ -1627,20 +1813,19 @@ namespace GTX.Core
                 case VectorSSMapId.ScraplineYard:
                     nodes = new[]
                     {
-                        new Vector3(0f, 0.08f, 8f),
-                        new Vector3(0f, 0.08f, 96f),
-                        new Vector3(24f, 0.08f, 164f),
-                        new Vector3(92f, 0.08f, 210f),
-                        new Vector3(166f, 0.08f, 192f),
-                        new Vector3(196f, 0.08f, 116f),
-                        new Vector3(150f, 0.08f, 42f),
-                        new Vector3(72f, 0.08f, 20f),
-                        new Vector3(18f, 0.08f, -38f),
-                        new Vector3(-64f, 0.08f, -20f),
-                        new Vector3(-92f, 0.08f, 64f),
-                        new Vector3(-42f, 0.08f, 130f)
+                        new Vector3(-12f, 0.08f, -78f),
+                        new Vector3(44f, 0.08f, -74f),
+                        new Vector3(116f, 0.08f, -18f),
+                        new Vector3(184f, 0.08f, 76f),
+                        new Vector3(196f, 0.08f, 148f),
+                        new Vector3(150f, 0.08f, 204f),
+                        new Vector3(72f, 0.08f, 214f),
+                        new Vector3(4f, 0.08f, 174f),
+                        new Vector3(-58f, 0.08f, 118f),
+                        new Vector3(-94f, 0.08f, 42f),
+                        new Vector3(-70f, 0.08f, -34f)
                     };
-                    nodeWidths = new[] { 22f, 28f, 42f, 54f, 48f, 36f, 30f, 42f, 24f, 28f, 30f, 24f };
+                    nodeWidths = new[] { 28f, 30f, 36f, 52f, 54f, 44f, 36f, 42f, 30f, 30f, 28f };
                     break;
                 case VectorSSMapId.RubberRidge:
                     nodes = new[]
@@ -1667,23 +1852,19 @@ namespace GTX.Core
                 default:
                     nodes = new[]
                     {
-                        new Vector3(0f, 0.08f, 8f),
-                        new Vector3(0f, 0.08f, 92f),
-                        new Vector3(2f, 1.65f, 130f),
-                        new Vector3(10f, 0.25f, 172f),
-                        new Vector3(46f, 0.08f, 232f),
-                        new Vector3(112f, 0.08f, 258f),
-                        new Vector3(166f, 0.08f, 214f),
-                        new Vector3(182f, 0.08f, 126f),
-                        new Vector3(142f, 0.08f, 34f),
-                        new Vector3(72f, 0.08f, -34f),
-                        new Vector3(-4f, 0.08f, -58f),
-                        new Vector3(-76f, 0.08f, -20f),
-                        new Vector3(-96f, 0.08f, 58f),
-                        new Vector3(-52f, 0.08f, 120f),
-                        new Vector3(-8f, 0.08f, 78f)
+                        new Vector3(-18f, 0.08f, -76f),
+                        new Vector3(54f, 0.08f, -58f),
+                        new Vector3(128f, 0.08f, 8f),
+                        new Vector3(178f, 0.08f, 94f),
+                        new Vector3(176f, 0.08f, 174f),
+                        new Vector3(126f, 0.08f, 248f),
+                        new Vector3(54f, 0.08f, 236f),
+                        new Vector3(12f, 1.65f, 176f),
+                        new Vector3(-46f, 0.25f, 132f),
+                        new Vector3(-98f, 0.08f, 68f),
+                        new Vector3(-82f, 0.08f, -18f)
                     };
-                    nodeWidths = new[] { 18f, 18f, 16f, 24f, 40f, 48f, 28f, 22f, 21f, 23f, 27f, 26f, 23f, 21f, 18f };
+                    nodeWidths = new[] { 22f, 24f, 24f, 22f, 28f, 46f, 42f, 22f, 24f, 24f, 22f };
                     break;
             }
 
@@ -1721,7 +1902,7 @@ namespace GTX.Core
             switch (mapId)
             {
                 case VectorSSMapId.ScraplineYard:
-                    return new Vector3(44f, -0.28f, 82f);
+                    return new Vector3(44f, -0.28f, 68f);
                 case VectorSSMapId.RubberRidge:
                     return new Vector3(18f, -0.28f, 34f);
                 default:
@@ -1734,7 +1915,7 @@ namespace GTX.Core
             switch (mapId)
             {
                 case VectorSSMapId.ScraplineYard:
-                    return new Vector3(340f, 0.18f, 300f);
+                    return new Vector3(340f, 0.18f, 330f);
                 case VectorSSMapId.RubberRidge:
                     return new Vector3(386f, 0.18f, 304f);
                 default:
@@ -1967,7 +2148,7 @@ namespace GTX.Core
 
         private void CreatePitDiorama(Transform root, RuntimeTrackRoute route)
         {
-            Transform pit = new GameObject("GTX Anime Rally Pit Diorama").transform;
+            Transform pit = new GameObject("VECTR Tuner Lab Pit Diorama").transform;
             pit.SetParent(root, false);
             TrackPose pitPose = route.PoseAtDistance(44f);
             pit.localPosition = pitPose.position - pitPose.right * (pitPose.width * 0.5f + 9f);
@@ -1987,6 +2168,17 @@ namespace GTX.Core
             CreateTireStack(pit, "Pit Tire Stack A", new Vector3(5.5f, 0.45f, -1.5f));
             CreateTireStack(pit, "Pit Tire Stack B", new Vector3(4.4f, 0.45f, -2.8f));
             CreateTireStack(pit, "Pit Tire Stack C", new Vector3(-5.2f, 0.45f, -1.2f));
+            CreateChamferedBox("Pit Metal Resource Bin", pit, new Vector3(-2.6f, 0.55f, 5.4f), Quaternion.identity, new Vector3(1.4f, 0.9f, 1f), inkMaterial, true, 0.06f);
+            CreatePrimitive("Pit Metal Bolt Icon", PrimitiveType.Cube, pit, new Vector3(-2.6f, 1.08f, 4.86f), Quaternion.Euler(0f, 0f, 45f), new Vector3(0.42f, 0.08f, 0.08f), trackMarkerBlueMaterial, false);
+            CreateChamferedBox("Pit Plastic Resource Bin", pit, new Vector3(-0.8f, 0.55f, 5.4f), Quaternion.identity, new Vector3(1.4f, 0.9f, 1f), playerSecondaryMaterial, true, 0.06f);
+            CreatePrimitive("Pit Plastic Aero Icon", PrimitiveType.Cube, pit, new Vector3(-0.8f, 1.08f, 4.86f), Quaternion.Euler(0f, 0f, -14f), new Vector3(0.62f, 0.08f, 0.08f), pitPropMaterial, false);
+            CreateChamferedBox("Pit Rubber Resource Bin", pit, new Vector3(1f, 0.55f, 5.4f), Quaternion.identity, new Vector3(1.4f, 0.9f, 1f), wheelMaterial, true, 0.06f);
+            CreatePrimitive("Pit Rubber Tread Icon", PrimitiveType.Cube, pit, new Vector3(1f, 1.08f, 4.86f), Quaternion.Euler(0f, 0f, 18f), new Vector3(0.58f, 0.08f, 0.08f), trackMarkerMaterial, false);
+            CreateChamferedBox("Pit Half Working Monitor", pit, new Vector3(3.7f, 1.6f, -5.2f), Quaternion.identity, new Vector3(2.3f, 1.25f, 0.18f), inkMaterial, false, 0.05f);
+            CreatePrimitive("Pit Monitor Cyan Scanline", PrimitiveType.Cube, pit, new Vector3(3.7f, 1.75f, -5.32f), Quaternion.identity, new Vector3(1.7f, 0.08f, 0.06f), trackMarkerBlueMaterial, false);
+            CreatePrimitive("Pit Monitor Warning Scanline", PrimitiveType.Cube, pit, new Vector3(3.55f, 1.43f, -5.32f), Quaternion.identity, new Vector3(1.1f, 0.08f, 0.06f), trackMarkerMaterial, false);
+            CreatePrimitive("Pit Cable Coil A", PrimitiveType.Cube, pit, new Vector3(-3.4f, 0.22f, -4f), Quaternion.Euler(0f, 24f, 0f), new Vector3(2.3f, 0.08f, 0.18f), inkMaterial, false);
+            CreatePrimitive("Pit Cable Coil B", PrimitiveType.Cube, pit, new Vector3(-3.9f, 0.25f, -3.5f), Quaternion.Euler(0f, -18f, 0f), new Vector3(1.5f, 0.08f, 0.18f), inkMaterial, false);
         }
 
         private void CreateMapDressing(Transform root, VectorSSMapDefinition map, RuntimeTrackRoute route)
@@ -2012,6 +2204,14 @@ namespace GTX.Core
                 TrackPose pose = route.PoseAtDistance(70f + i * 48f);
                 CreateChamferedBox("Blackline Elevated Pylon L " + i, root, pose.position - pose.right * (pose.width * 0.5f + 5f) + Vector3.up * 5f, pose.rotation, new Vector3(1.2f, 10f, 1.2f), inkMaterial, true, 0.07f);
                 CreateChamferedBox("Blackline Elevated Pylon R " + i, root, pose.position + pose.right * (pose.width * 0.5f + 5f) + Vector3.up * 5f, pose.rotation, new Vector3(1.2f, 10f, 1.2f), inkMaterial, true, 0.07f);
+                Vector3 signPosition = pose.position + pose.right * (i % 2 == 0 ? -(pose.width * 0.5f + 8.5f) : pose.width * 0.5f + 8.5f) + Vector3.up * 4.2f;
+                CreateTrackBillboard(root, "Blackline Neon Ad Board " + i, signPosition, pose.rotation, i % 2 == 0 ? trackMarkerBlueMaterial : trackMarkerMaterial, "VECTR BLK");
+            }
+
+            for (int i = 0; i < 4; i++)
+            {
+                TrackPose pose = route.PoseAtDistance(118f + i * 122f);
+                CreateOverheadRaceLight(root, "Blackline Overhead Dash Module " + i, pose, i % 2 == 0 ? trackMarkerBlueMaterial : trackMarkerMaterial);
             }
         }
 
@@ -2032,6 +2232,14 @@ namespace GTX.Core
             TrackPose cranePose = route.PoseAtDistance(220f);
             CreateChamferedBox("Scrapline Crane Tower", root, cranePose.position - cranePose.right * 34f + Vector3.up * 6f, cranePose.rotation, new Vector3(2f, 12f, 2f), inkMaterial, true, 0.06f);
             CreateChamferedBox("Scrapline Crane Arm", root, cranePose.position - cranePose.right * 18f + Vector3.up * 12f, cranePose.rotation * Quaternion.Euler(0f, 0f, 4f), new Vector3(34f, 0.8f, 1f), playerSecondaryMaterial, true, 0.04f);
+            for (int i = 0; i < 6; i++)
+            {
+                TrackPose pose = route.PoseAtDistance(72f + i * 64f);
+                float side = i % 2 == 0 ? -1f : 1f;
+                Vector3 position = pose.position + pose.right * side * (pose.width * 0.5f + 4.6f) + Vector3.up * 0.16f;
+                CreateHazardPanel(root, "Scrapline Hazard Teeth " + i, position, pose.rotation, side);
+                CreateOilSmear(root, "Scrapline Oil Smear " + i, pose.position - pose.forward * 3f + pose.right * side * (pose.width * 0.22f), pose.rotation);
+            }
         }
 
         private void CreateRubberRidgeDressing(Transform root, RuntimeTrackRoute route)
@@ -2053,6 +2261,53 @@ namespace GTX.Core
             float[] widths = { 5.2f, 4.5f, 5.2f };
             LowPolyMeshFactory.CreateTrackRibbon("Rubber Ridge Razor Shortcut", root, shortcut, widths, roadMaterial, true);
             LowPolyMeshFactory.CreateTrackRibbon("Rubber Ridge Shortcut Ink", root, new[] { shortcut[0] + Vector3.up * 0.04f, shortcut[1] + Vector3.up * 0.04f, shortcut[2] + Vector3.up * 0.04f }, new[] { 0.18f, 0.18f, 0.18f }, trackMarkerBlueMaterial, false);
+
+            for (int i = 0; i < 7; i++)
+            {
+                TrackPose pose = route.PoseAtDistance(88f + i * 74f);
+                float side = i % 2 == 0 ? -1f : 1f;
+                Vector3 marker = pose.position + pose.right * side * (pose.width * 0.5f - 1.6f) + Vector3.up * 0.22f;
+                CreatePrimitive("Rubber Ridge Apex Ink Tooth " + i, PrimitiveType.Cube, root, marker, pose.rotation * Quaternion.Euler(0f, side * 34f, 0f), new Vector3(0.36f, 0.08f, 2.6f), trackMarkerBlueMaterial, false);
+                CreateChamferedBox("Rubber Ridge Cliff Shadow Slab " + i, root, pose.position - pose.right * side * (pose.width * 0.5f + 8f) + Vector3.up * 2.2f, pose.rotation, new Vector3(8f, 4f, 1.1f), desertMaterial, false, 0.12f);
+            }
+        }
+
+        private void CreateTrackBillboard(Transform root, string name, Vector3 position, Quaternion rotation, Material material, string label)
+        {
+            CreateChamferedBox(name + " Ink Backer", root, position, rotation, new Vector3(5.8f, 2f, 0.26f), inkMaterial, false, 0.08f);
+            CreateChamferedBox(name + " Face", root, position + Vector3.up * 0.04f, rotation, new Vector3(5.25f, 1.45f, 0.18f), material, false, 0.05f);
+            CreatePrimitive(name + " Label Bar A " + label, PrimitiveType.Cube, root, position + Vector3.up * 0.34f, rotation, new Vector3(3.6f, 0.18f, 0.2f), pitPropMaterial, false);
+            CreatePrimitive(name + " Label Bar B", PrimitiveType.Cube, root, position - Vector3.up * 0.26f, rotation, new Vector3(2.15f, 0.14f, 0.2f), inkMaterial, false);
+        }
+
+        private void CreateOverheadRaceLight(Transform root, string name, TrackPose pose, Material material)
+        {
+            Transform lightRig = new GameObject(name).transform;
+            lightRig.SetParent(root, false);
+            lightRig.localPosition = pose.position + Vector3.up * 5.4f;
+            lightRig.localRotation = pose.rotation;
+            float width = pose.width * 0.5f + 1.2f;
+            CreateChamferedBox(name + " Crossbar", lightRig, Vector3.zero, Quaternion.identity, new Vector3(width * 2f, 0.24f, 0.32f), inkMaterial, false, 0.04f);
+            for (int i = 0; i < 5; i++)
+            {
+                CreateOutlinedPrism(lightRig, name + " LED " + i, 10, new Vector3(-1.6f + i * 0.8f, -0.34f, -0.04f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.26f, 0.26f, 0.07f), material, VectrStyleTokens.DetailOutlineMultiplier);
+            }
+        }
+
+        private void CreateHazardPanel(Transform root, string name, Vector3 position, Quaternion rotation, float side)
+        {
+            CreateChamferedBox(name + " Ink Plate", root, position, rotation, new Vector3(4.2f, 0.18f, 1.4f), inkMaterial, false, 0.05f);
+            for (int i = 0; i < 4; i++)
+            {
+                CreatePrimitive(name + " Orange Stripe " + i, PrimitiveType.Cube, root, position + Vector3.up * 0.1f, rotation * Quaternion.Euler(0f, 28f * side, 0f), new Vector3(0.24f, 0.08f, 1.52f), trackMarkerMaterial, false);
+                position += (rotation * Vector3.right) * 0.82f;
+            }
+        }
+
+        private void CreateOilSmear(Transform root, string name, Vector3 position, Quaternion rotation)
+        {
+            CreatePrimitive(name + " Ink Pool", PrimitiveType.Cube, root, position + Vector3.up * 0.06f, rotation * Quaternion.Euler(0f, 18f, 0f), new Vector3(3.4f, 0.035f, 1.25f), inkMaterial, false);
+            CreatePrimitive(name + " Sheen", PrimitiveType.Cube, root, position + Vector3.up * 0.075f, rotation * Quaternion.Euler(0f, -12f, 0f), new Vector3(1.75f, 0.028f, 0.28f), trackMarkerBlueMaterial, false);
         }
 
         private void CreateTireStack(Transform parent, string name, Vector3 position)
@@ -2175,39 +2430,217 @@ namespace GTX.Core
         private void CreateCarVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
         {
             Transform visualRoot = parent;
-            Vector3 scale = vehicleDefinition.visualScale;
-            CreateOutlinedChamferedBox(visualRoot, "Player Body", new Vector3(0f, 0.68f, 0f), Quaternion.identity, Vector3.Scale(new Vector3(2.26f, 0.64f, 4.34f), scale), playerMaterial, 1.09f * playerProfile.tuning.outlineThickness, 0.1f);
-            CreateOutlinedChamferedBox(visualRoot, "Player Cabin Block", new Vector3(0f, 1.16f, -0.35f * scale.z), Quaternion.identity, Vector3.Scale(new Vector3(1.38f, 0.56f, 1.36f), scale), glassMaterial, 1.08f * playerProfile.tuning.outlineThickness, 0.09f);
-            CreateOutlinedWedge(visualRoot, "Player Front Bite", new Vector3(0f, 0.94f, 1.78f * scale.z), Quaternion.identity, Vector3.Scale(new Vector3(2.12f, 0.38f, 1.16f), scale), playerMaterial, 1.08f * playerProfile.tuning.outlineThickness);
-            CreatePrimitive("Player Hood Blue Slash", PrimitiveType.Cube, visualRoot, new Vector3(-0.34f * scale.x, 1.05f, 1.28f * scale.z), Quaternion.Euler(0f, -10f, 0f), new Vector3(0.28f, 0.08f, 1.75f), playerSecondaryMaterial, false);
-            CreatePrimitive("Player Hood Orange Slash", PrimitiveType.Cube, visualRoot, new Vector3(0.22f * scale.x, 1.06f, 1.2f * scale.z), Quaternion.Euler(0f, -10f, 0f), new Vector3(0.36f, 0.09f, 1.9f), playerAccentMaterial, false);
-            CreatePrimitive("Player Roof Print Plate", PrimitiveType.Cube, visualRoot, new Vector3(0f, 1.48f, -0.38f * scale.z), Quaternion.identity, new Vector3(1.18f, 0.08f, 0.86f), playerAccentMaterial, false);
-            CreatePrimitive("Player Roof Blue Label", PrimitiveType.Cube, visualRoot, new Vector3(0f, 1.535f, -0.38f * scale.z), Quaternion.identity, new Vector3(0.62f, 0.06f, 0.38f), playerSecondaryMaterial, false);
-            CreateRallyLivery(visualRoot);
-            CreateRoundedMachineCaps(visualRoot);
-            CreateLowPolyFin(visualRoot, "Left Armor Fin", new Vector3(-1.28f * scale.x, 0.88f, -0.5f * scale.z), Quaternion.Euler(0f, 0f, -8f));
-            CreateLowPolyFin(visualRoot, "Right Armor Fin", new Vector3(1.28f * scale.x, 0.88f, -0.5f * scale.z), Quaternion.Euler(0f, 180f, 8f));
+            RetroCarVisualProfile profile = RetroCarVisualProfile.ForVehicle(vehicleDefinition.id, vehicleDefinition.visualScale);
+            float outline = playerProfile.tuning.outlineThickness;
+
+            CreateOutlinedRetroCarBody(visualRoot, "VECTR Continuous Retro Body", profile, playerMaterial, VectrStyleTokens.OuterOutlineMultiplier * outline);
+            CreateRetroGlassPanels(visualRoot, profile);
+            CreateRetroWheelArch(visualRoot, "Front", profile.frontWheelZ, profile);
+            CreateRetroWheelArch(visualRoot, "Rear", profile.rearWheelZ, profile);
+            CreateRetroFaceDetails(visualRoot, profile);
+            CreateRallyLivery(visualRoot, profile);
+            CreateRoundedMachineCaps(visualRoot, profile);
+            CreateRetroSideMirrors(visualRoot, profile);
+            CreateVehicleClassVisualKit(visualRoot, vehicleDefinition, profile.scale);
+        }
+
+        private GameObject CreateOutlinedRetroCarBody(Transform parent, string name, RetroCarVisualProfile profile, Material material, float outlineMultiplier)
+        {
+            if (hasInvertedHullOutline)
+            {
+                GameObject outline = LowPolyVehicleMeshFactory.CreateRetroCarBody(name + " Outline", parent, profile, outlineMaterial, false);
+                outline.transform.localScale = Vector3.one * outlineMultiplier;
+            }
+
+            return LowPolyVehicleMeshFactory.CreateRetroCarBody(name, parent, profile, material, false);
+        }
+
+        private void CreateRetroGlassPanels(Transform parent, RetroCarVisualProfile profile)
+        {
+            float front = profile.cabinFrontZ;
+            float roofFront = profile.cabinFrontZ - profile.hoodLength * 0.2f;
+            float rearRoof = profile.cabinRearZ + profile.trunkLength * 0.08f;
+            float rearGlass = profile.cabinRearZ - profile.trunkLength * 0.34f;
+            float glassInset = 0.08f * profile.scale.x;
+            float sideX = profile.halfWidth + 0.012f;
+            float sideTopX = profile.cabinHalfWidth + 0.05f * profile.scale.x;
+
+            CreatePanelWithBacker(
+                parent,
+                "Retro Windshield Panel",
+                new Vector3(-profile.cabinHalfWidth - glassInset, profile.beltY + 0.08f * profile.scale.y, front + 0.04f * profile.scale.z),
+                new Vector3(profile.cabinHalfWidth + glassInset, profile.beltY + 0.08f * profile.scale.y, front + 0.04f * profile.scale.z),
+                new Vector3(sideTopX, profile.roofY - 0.11f * profile.scale.y, roofFront),
+                new Vector3(-sideTopX, profile.roofY - 0.11f * profile.scale.y, roofFront),
+                glassMaterial,
+                1.045f);
+
+            CreatePanelWithBacker(
+                parent,
+                "Retro Rear Glass Panel",
+                new Vector3(-profile.cabinHalfWidth * 0.96f, profile.roofY - 0.13f * profile.scale.y, rearRoof),
+                new Vector3(profile.cabinHalfWidth * 0.96f, profile.roofY - 0.13f * profile.scale.y, rearRoof),
+                new Vector3(profile.cabinHalfWidth + glassInset, profile.deckY + 0.18f * profile.scale.y, rearGlass),
+                new Vector3(-profile.cabinHalfWidth - glassInset, profile.deckY + 0.18f * profile.scale.y, rearGlass),
+                glassMaterial,
+                1.045f);
+
+            CreatePanelWithBacker(
+                parent,
+                "Left Retro Side Window",
+                new Vector3(-sideX, profile.beltY + 0.1f * profile.scale.y, front - 0.05f * profile.scale.z),
+                new Vector3(-sideX, profile.beltY + 0.1f * profile.scale.y, rearGlass + 0.06f * profile.scale.z),
+                new Vector3(-sideTopX, profile.roofY - 0.14f * profile.scale.y, rearRoof - 0.08f * profile.scale.z),
+                new Vector3(-sideTopX, profile.roofY - 0.12f * profile.scale.y, roofFront + 0.08f * profile.scale.z),
+                glassMaterial,
+                1.04f);
+
+            CreatePanelWithBacker(
+                parent,
+                "Right Retro Side Window",
+                new Vector3(sideX, profile.beltY + 0.1f * profile.scale.y, rearGlass + 0.06f * profile.scale.z),
+                new Vector3(sideX, profile.beltY + 0.1f * profile.scale.y, front - 0.05f * profile.scale.z),
+                new Vector3(sideTopX, profile.roofY - 0.12f * profile.scale.y, roofFront + 0.08f * profile.scale.z),
+                new Vector3(sideTopX, profile.roofY - 0.14f * profile.scale.y, rearRoof - 0.08f * profile.scale.z),
+                glassMaterial,
+                1.04f);
+
+            float pillarZ = Mathf.Lerp(front, rearGlass, 0.42f);
+            CreatePrimitive("Left Retro Black B Pillar", PrimitiveType.Cube, parent, new Vector3(-sideX - 0.018f, profile.beltY + 0.28f * profile.scale.y, pillarZ), Quaternion.identity, new Vector3(0.055f * profile.scale.x, 0.62f * profile.scale.y, 0.09f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive("Right Retro Black B Pillar", PrimitiveType.Cube, parent, new Vector3(sideX + 0.018f, profile.beltY + 0.28f * profile.scale.y, pillarZ), Quaternion.identity, new Vector3(0.055f * profile.scale.x, 0.62f * profile.scale.y, 0.09f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive("Retro Roof Rally Strip", PrimitiveType.Cube, parent, new Vector3(0f, profile.roofY + 0.035f * profile.scale.y, Mathf.Lerp(roofFront, rearRoof, 0.48f)), Quaternion.identity, new Vector3(profile.cabinHalfWidth * 1.72f, 0.055f * profile.scale.y, Mathf.Abs(roofFront - rearRoof) * 0.74f), playerAccentMaterial, false);
+        }
+
+        private void CreatePanelWithBacker(Transform parent, string name, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Material material, float backerScale)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector3.up;
+            Vector3 panelOffset = normal * 0.006f;
+            if (hasInvertedHullOutline)
+            {
+                Vector3 center = (a + b + c + d) * 0.25f;
+                LowPolyVehicleMeshFactory.CreateQuadPanel(name + " Ink Gasket", parent, ScalePoint(a, center, backerScale) - panelOffset, ScalePoint(b, center, backerScale) - panelOffset, ScalePoint(c, center, backerScale) - panelOffset, ScalePoint(d, center, backerScale) - panelOffset, inkMaterial);
+            }
+
+            LowPolyVehicleMeshFactory.CreateQuadPanel(name, parent, a + panelOffset, b + panelOffset, c + panelOffset, d + panelOffset, material);
+        }
+
+        private static Vector3 ScalePoint(Vector3 point, Vector3 center, float scale)
+        {
+            return center + (point - center) * scale;
+        }
+
+        private static Vector3 CarPos(float x, float y, float z, Vector3 scale)
+        {
+            return new Vector3(x * scale.x, y, z * scale.z);
+        }
+
+        private static Vector3 CarScale(float x, float y, float z, Vector3 scale)
+        {
+            return new Vector3(x * scale.x, y * scale.y, z * scale.z);
         }
 
         private Transform CreateRazorBikeVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
         {
+            Vector3 scale = vehicleDefinition.visualScale;
+            float outline = playerProfile.tuning.outlineThickness;
             Transform leanRoot = new GameObject("Razor Lean Visual").transform;
             leanRoot.SetParent(parent, false);
             parent.gameObject.AddComponent<VectorSSBikeLeanVisual>();
 
-            CreateOutlinedPrism(leanRoot, "Razor Front Wheel", 10, new Vector3(0f, 0.43f, 1.08f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.72f, 0.72f, 0.18f), wheelMaterial, 1.06f * playerProfile.tuning.outlineThickness);
-            CreateOutlinedPrism(leanRoot, "Razor Rear Wheel", 10, new Vector3(0f, 0.43f, -1.08f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.72f, 0.72f, 0.18f), wheelMaterial, 1.06f * playerProfile.tuning.outlineThickness);
-            CreateOutlinedChamferedBox(leanRoot, "Razor Spine Frame", new Vector3(0f, 0.78f, 0f), Quaternion.Euler(-4f, 0f, 0f), new Vector3(0.36f, 0.32f, 2.2f), playerMaterial, 1.12f * playerProfile.tuning.outlineThickness, 0.08f);
-            CreateOutlinedWedge(leanRoot, "Razor Front Fairing", new Vector3(0f, 0.94f, 0.86f), Quaternion.identity, new Vector3(0.72f, 0.44f, 0.9f), playerAccentMaterial, 1.1f * playerProfile.tuning.outlineThickness);
-            CreateOutlinedChamferedBox(leanRoot, "Razor Battery Block", new Vector3(0f, 0.92f, -0.28f), Quaternion.identity, new Vector3(0.64f, 0.5f, 0.72f), playerSecondaryMaterial, 1.08f * playerProfile.tuning.outlineThickness, 0.08f);
-            CreateOutlinedPrism(leanRoot, "Razor Fork", 6, new Vector3(0f, 0.78f, 1.18f), Quaternion.Euler(16f, 0f, 0f), new Vector3(0.16f, 0.16f, 1f), inkMaterial, 1.04f);
-            CreateOutlinedPrism(leanRoot, "Razor Handlebar", 6, new Vector3(0f, 1.28f, 0.92f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.12f, 0.12f, 1.25f), inkMaterial, 1.04f);
-            CreateOutlinedChamferedBox(leanRoot, "Razor Rider Torso", new Vector3(0f, 1.36f, -0.24f), Quaternion.Euler(-12f, 0f, 0f), new Vector3(0.48f, 0.72f, 0.36f), inkMaterial, 1.06f, 0.08f);
-            CreateOutlinedPrism(leanRoot, "Razor Rider Helmet", 10, new Vector3(0f, 1.84f, 0.02f), Quaternion.identity, new Vector3(0.42f, 0.42f, 0.42f), glassMaterial, 1.08f);
-            CreatePrimitive("Razor Side Check Left", PrimitiveType.Cube, leanRoot, new Vector3(-0.46f, 0.86f, -0.05f), Quaternion.Euler(0f, 0f, -10f), new Vector3(0.08f, 0.42f, 1.34f), playerAccentMaterial, false);
-            CreatePrimitive("Razor Side Check Right", PrimitiveType.Cube, leanRoot, new Vector3(0.46f, 0.86f, -0.05f), Quaternion.Euler(0f, 0f, 10f), new Vector3(0.08f, 0.42f, 1.34f), playerAccentMaterial, false);
+            CreateRazorWheelsAndHardware(leanRoot, scale, outline);
+            CreateOutlinedRazorBikeBody(leanRoot, "Razor Continuous Fairing Shell", scale, playerMaterial, VectrStyleTokens.OuterOutlineMultiplier * outline);
+            CreateRazorFairingPanels(leanRoot, scale);
+            CreateRazorCockpitAndRider(leanRoot, scale);
+            CreateRazorDecalsAndNeon(leanRoot, scale);
 
-            return LowPolyMeshFactory.CreatePrism("Razor Narrow Boost Trail", leanRoot, 6, new Vector3(0f, 0.46f, -2.35f), Quaternion.identity, new Vector3(0.34f, 0.34f, 2.2f), boostTrailMaterial, false).transform;
+            Transform trail = LowPolyMeshFactory.CreatePrism("Razor Narrow Boost Trail", leanRoot, 3, new Vector3(0f, 0.54f * scale.y, -2.38f * scale.z), Quaternion.Euler(0f, 0f, 30f), new Vector3(0.22f * scale.x, 0.18f * scale.y, 2.45f * scale.z), boostTrailMaterial, false).transform;
+            CreatePrimitive("Razor Left Boost Slice", PrimitiveType.Cube, leanRoot, new Vector3(-0.18f * scale.x, 0.58f * scale.y, -1.88f * scale.z), Quaternion.Euler(0f, 0f, -18f), new Vector3(0.035f * scale.x, 0.08f * scale.y, 1.2f * scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Razor Right Boost Slice", PrimitiveType.Cube, leanRoot, new Vector3(0.18f * scale.x, 0.58f * scale.y, -1.88f * scale.z), Quaternion.Euler(0f, 0f, 18f), new Vector3(0.035f * scale.x, 0.08f * scale.y, 1.2f * scale.z), playerSecondaryMaterial, false);
+            return trail;
+        }
+
+        private GameObject CreateOutlinedRazorBikeBody(Transform parent, string name, Vector3 scale, Material material, float outlineMultiplier)
+        {
+            if (hasInvertedHullOutline)
+            {
+                GameObject outline = LowPolyVehicleMeshFactory.CreateRazorBikeBody(name + " Outline", parent, scale, outlineMaterial, false);
+                outline.transform.localScale = Vector3.one * outlineMultiplier;
+            }
+
+            return LowPolyVehicleMeshFactory.CreateRazorBikeBody(name, parent, scale, material, false);
+        }
+
+        private void CreateRazorWheelsAndHardware(Transform parent, Vector3 scale, float outline)
+        {
+            float wheelDiameter = 0.82f * scale.y;
+            float tireWidth = 0.18f * scale.x;
+            Vector3 front = new Vector3(0f, 0.43f * scale.y, 1.08f * scale.z);
+            Vector3 rear = new Vector3(0f, 0.43f * scale.y, -1.08f * scale.z);
+
+            CreateOutlinedPrism(parent, "Razor Front Wheel", 12, front, Quaternion.Euler(0f, 90f, 0f), new Vector3(wheelDiameter, wheelDiameter, tireWidth), wheelMaterial, 1.06f * outline);
+            CreateOutlinedPrism(parent, "Razor Rear Wheel", 12, rear, Quaternion.Euler(0f, 90f, 0f), new Vector3(wheelDiameter, wheelDiameter, tireWidth), wheelMaterial, 1.06f * outline);
+            CreateOutlinedPrism(parent, "Razor Front Cyan Rim", 10, front + new Vector3(0.01f * scale.x, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), new Vector3(wheelDiameter * 0.48f, wheelDiameter * 0.48f, tireWidth * 1.12f), playerSecondaryMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+            CreateOutlinedPrism(parent, "Razor Rear Cyan Rim", 10, rear + new Vector3(0.01f * scale.x, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), new Vector3(wheelDiameter * 0.48f, wheelDiameter * 0.48f, tireWidth * 1.12f), playerSecondaryMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+
+            for (int i = 0; i < 2; i++)
+            {
+                float side = i == 0 ? -1f : 1f;
+                CreateOutlinedChamferedBox(parent, "Razor Front Fork " + i, new Vector3(side * 0.12f * scale.x, 0.78f * scale.y, 1.12f * scale.z), Quaternion.Euler(15f, 0f, 0f), new Vector3(0.055f * scale.x, 0.07f * scale.y, 0.96f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.018f);
+                CreateOutlinedChamferedBox(parent, "Razor Rear Swingarm " + i, new Vector3(side * 0.15f * scale.x, 0.62f * scale.y, -0.75f * scale.z), Quaternion.Euler(-10f, 0f, 0f), new Vector3(0.055f * scale.x, 0.07f * scale.y, 0.98f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.018f);
+            }
+
+            CreateOutlinedPrism(parent, "Razor Handlebar", 6, new Vector3(0f, 1.23f * scale.y, 0.82f * scale.z), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.08f * scale.y, 0.08f * scale.y, 0.9f * scale.x), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+        }
+
+        private void CreateRazorFairingPanels(Transform parent, Vector3 scale)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                float side = i == 0 ? -1f : 1f;
+                CreatePanelWithBacker(
+                    parent,
+                    side < 0f ? "Razor Left Dark Fairing Panel" : "Razor Right Dark Fairing Panel",
+                    new Vector3(side * 0.31f * scale.x, 0.76f * scale.y, 1.08f * scale.z),
+                    new Vector3(side * 0.42f * scale.x, 1.02f * scale.y, 0.56f * scale.z),
+                    new Vector3(side * 0.36f * scale.x, 0.98f * scale.y, -0.58f * scale.z),
+                    new Vector3(side * 0.24f * scale.x, 0.72f * scale.y, -0.2f * scale.z),
+                    playerSecondaryMaterial,
+                    1.035f);
+                CreatePanelWithBacker(
+                    parent,
+                    side < 0f ? "Razor Left Acid Blade Graphic" : "Razor Right Acid Blade Graphic",
+                    new Vector3(side * 0.43f * scale.x, 0.96f * scale.y, 0.72f * scale.z),
+                    new Vector3(side * 0.45f * scale.x, 1.08f * scale.y, 0.46f * scale.z),
+                    new Vector3(side * 0.36f * scale.x, 0.92f * scale.y, -0.4f * scale.z),
+                    new Vector3(side * 0.31f * scale.x, 0.82f * scale.y, -0.1f * scale.z),
+                    playerAccentMaterial,
+                    1.02f);
+                CreateOutlinedPrism(parent, side < 0f ? "Razor Left Number Disc" : "Razor Right Number Disc", 12, new Vector3(side * 0.43f * scale.x, 0.9f * scale.y, 0.16f * scale.z), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.26f * scale.y, 0.26f * scale.y, 0.035f * scale.x), glassMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+                CreatePrimitive(side < 0f ? "Razor Left Side Check Rail" : "Razor Right Side Check Rail", PrimitiveType.Cube, parent, new Vector3(side * 0.46f * scale.x, 0.78f * scale.y, -0.02f * scale.z), Quaternion.Euler(0f, 0f, side * 10f), new Vector3(0.045f * scale.x, 0.26f * scale.y, 1.14f * scale.z), playerAccentMaterial, false);
+            }
+        }
+
+        private void CreateRazorCockpitAndRider(Transform parent, Vector3 scale)
+        {
+            CreatePanelWithBacker(
+                parent,
+                "Razor Smoked Windscreen",
+                new Vector3(-0.24f * scale.x, 1.05f * scale.y, 0.86f * scale.z),
+                new Vector3(0.24f * scale.x, 1.05f * scale.y, 0.86f * scale.z),
+                new Vector3(0.15f * scale.x, 1.42f * scale.y, 0.42f * scale.z),
+                new Vector3(-0.15f * scale.x, 1.42f * scale.y, 0.42f * scale.z),
+                glassMaterial,
+                1.08f);
+            CreateOutlinedWedge(parent, "Razor Tucked Rider Silhouette", new Vector3(0f, 1.29f * scale.y, -0.14f * scale.z), Quaternion.Euler(-14f, 180f, 0f), new Vector3(0.36f * scale.x, 0.38f * scale.y, 0.72f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+            CreateOutlinedPrism(parent, "Razor Low Helmet", 10, new Vector3(0f, 1.54f * scale.y, 0.26f * scale.z), Quaternion.identity, new Vector3(0.28f * scale.y, 0.28f * scale.y, 0.28f * scale.y), glassMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+        }
+
+        private void CreateRazorDecalsAndNeon(Transform parent, Vector3 scale)
+        {
+            CreatePrimitive("Razor Cyan Module Light", PrimitiveType.Cube, parent, new Vector3(0f, 1.12f * scale.y, 0.5f * scale.z), Quaternion.identity, new Vector3(0.38f * scale.x, 0.055f * scale.y, 0.08f * scale.z), playerSecondaryMaterial, false);
+            CreatePrimitive("Razor Acid Tank Stripe", PrimitiveType.Cube, parent, new Vector3(0f, 1.22f * scale.y, 0.02f * scale.z), Quaternion.Euler(0f, 0f, -18f), new Vector3(0.08f * scale.x, 0.055f * scale.y, 0.86f * scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Razor Tail Warning Slice", PrimitiveType.Cube, parent, new Vector3(0f, 1.06f * scale.y, -1.14f * scale.z), Quaternion.identity, new Vector3(0.4f * scale.x, 0.06f * scale.y, 0.08f * scale.z), playerAccentMaterial, false);
         }
 
         private Vector3[] WheelColliderPositions(VectorSSVehicleDefinition vehicleDefinition)
@@ -2260,50 +2693,108 @@ namespace GTX.Core
             GameObject assembly = new GameObject(name + " Visual");
             assembly.transform.SetParent(parent, false);
             assembly.transform.localPosition = localPosition;
-            assembly.transform.localRotation = Quaternion.identity;
+            assembly.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
 
-            float diameter = Mathf.Lerp(0.82f, 0.92f, Mathf.Clamp01((vehicleScale.x + vehicleScale.z - 1.8f) * 0.5f));
+            float diameter = Mathf.Lerp(1.02f, 1.16f, Mathf.Clamp01((vehicleScale.x + vehicleScale.z - 1.8f) * 0.5f));
             CreateOutlinedPrism(assembly.transform, name + " Tire", 10, Vector3.zero, Quaternion.identity, new Vector3(diameter, diameter, 0.34f), wheelMaterial, 1.08f * playerProfile.tuning.outlineThickness);
-            CreatePrimitive(name + " Orange Spoke A", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.19f), Quaternion.identity, new Vector3(0.11f, diameter * 0.72f, 0.045f), playerAccentMaterial, false);
-            CreatePrimitive(name + " Blue Spoke B", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.245f), Quaternion.Euler(0f, 0f, 90f), new Vector3(0.09f, diameter * 0.56f, 0.04f), playerSecondaryMaterial, false);
-            CreatePrimitive(name + " Hub", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.29f), Quaternion.identity, new Vector3(0.2f, 0.2f, 0.055f), inkMaterial, false);
+            CreateOutlinedPrism(assembly.transform, name + " Deep Dish Rim", 8, new Vector3(0f, 0f, 0.19f), Quaternion.identity, new Vector3(diameter * 0.58f, diameter * 0.58f, 0.12f), playerSecondaryMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+            CreatePrimitive(name + " Accent Spoke A", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.28f), Quaternion.identity, new Vector3(0.1f, diameter * 0.68f, 0.045f), playerAccentMaterial, false);
+            CreatePrimitive(name + " Accent Spoke B", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.315f), Quaternion.Euler(0f, 0f, 90f), new Vector3(0.09f, diameter * 0.54f, 0.04f), playerAccentMaterial, false);
+            CreatePrimitive(name + " Tire Letter Block", PrimitiveType.Cube, assembly.transform, new Vector3(0f, diameter * 0.44f, 0.32f), Quaternion.identity, new Vector3(diameter * 0.34f, 0.05f, 0.035f), playerSecondaryMaterial, false);
+            CreatePrimitive(name + " Hub", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.36f), Quaternion.identity, new Vector3(0.2f, 0.2f, 0.055f), inkMaterial, false);
             return assembly;
         }
 
-        private void CreateRoundedMachineCaps(Transform parent)
+        private void CreateRetroWheelArch(Transform parent, string label, float z, RetroCarVisualProfile profile)
         {
-            CreateOutlinedPrism(parent, "Player Front Orange Bumper Tube", 10, new Vector3(0f, 0.62f, 2.27f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.26f, 0.26f, 2.22f), playerAccentMaterial, 1.08f);
-            CreateOutlinedPrism(parent, "Player Rear Blue Bumper Tube", 10, new Vector3(0f, 0.62f, -2.27f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.26f, 0.26f, 2.22f), playerSecondaryMaterial, 1.08f);
-            CreateOutlinedPrism(parent, "Player Left Rounded Rocker", 10, new Vector3(-1.21f, 0.62f, -0.1f), Quaternion.identity, new Vector3(0.2f, 0.2f, 3.4f), playerSecondaryMaterial, 1.08f);
-            CreateOutlinedPrism(parent, "Player Right Rounded Rocker", 10, new Vector3(1.21f, 0.62f, -0.1f), Quaternion.identity, new Vector3(0.2f, 0.2f, 3.4f), playerSecondaryMaterial, 1.08f);
+            float outline = playerProfile.tuning.outlineThickness;
+            float sideX = profile.halfWidth + profile.fenderWidth * 0.4f;
+            float fenderHeight = profile.wheelRadius * 0.95f;
+            float fenderLength = profile.wheelRadius * 2.06f;
+            float archDiameter = profile.wheelRadius * 2.16f;
+            float archY = 0.43f * profile.scale.y;
+            CreateOutlinedChamferedBox(parent, label + " Left Integrated Fender", new Vector3(-sideX, archY + fenderHeight * 0.24f, z), Quaternion.identity, new Vector3(profile.fenderWidth * 1.42f, fenderHeight, fenderLength), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier * outline, 0.13f);
+            CreateOutlinedChamferedBox(parent, label + " Right Integrated Fender", new Vector3(sideX, archY + fenderHeight * 0.24f, z), Quaternion.identity, new Vector3(profile.fenderWidth * 1.42f, fenderHeight, fenderLength), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier * outline, 0.13f);
+            CreateOutlinedPrism(parent, label + " Left Ink Wheel Well", 14, new Vector3(-profile.halfWidth - 0.03f * profile.scale.x, archY, z), Quaternion.Euler(0f, 90f, 0f), new Vector3(archDiameter, archDiameter, 0.07f * profile.scale.x), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+            CreateOutlinedPrism(parent, label + " Right Ink Wheel Well", 14, new Vector3(profile.halfWidth + 0.03f * profile.scale.x, archY, z), Quaternion.Euler(0f, 90f, 0f), new Vector3(archDiameter, archDiameter, 0.07f * profile.scale.x), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier);
         }
 
-        private void CreateRallyLivery(Transform parent)
+        private void CreateRetroFaceDetails(Transform parent, RetroCarVisualProfile profile)
         {
-            CreatePrimitive("Left Door Blue Print Block", PrimitiveType.Cube, parent, new Vector3(-1.16f, 0.8f, -0.22f), Quaternion.identity, new Vector3(0.07f, 0.46f, 1.42f), playerSecondaryMaterial, false);
-            CreatePrimitive("Right Door Blue Print Block", PrimitiveType.Cube, parent, new Vector3(1.16f, 0.8f, -0.22f), Quaternion.identity, new Vector3(0.07f, 0.46f, 1.42f), playerSecondaryMaterial, false);
-            CreatePrimitive("Left Door Orange Plate", PrimitiveType.Cube, parent, new Vector3(-1.2f, 0.82f, 0.6f), Quaternion.identity, new Vector3(0.08f, 0.36f, 0.52f), playerAccentMaterial, false);
-            CreatePrimitive("Right Door Orange Plate", PrimitiveType.Cube, parent, new Vector3(1.2f, 0.82f, 0.6f), Quaternion.identity, new Vector3(0.08f, 0.36f, 0.52f), playerAccentMaterial, false);
-            CreatePrimitive("Rear Quarter Blue A", PrimitiveType.Cube, parent, new Vector3(-1.18f, 0.82f, -1.42f), Quaternion.Euler(0f, 0f, 10f), new Vector3(0.07f, 0.34f, 0.9f), playerSecondaryMaterial, false);
-            CreatePrimitive("Rear Quarter Blue B", PrimitiveType.Cube, parent, new Vector3(1.18f, 0.82f, -1.42f), Quaternion.Euler(0f, 0f, -10f), new Vector3(0.07f, 0.34f, 0.9f), playerSecondaryMaterial, false);
-            CreatePrimitive("Front Bumper Orange Lip", PrimitiveType.Cube, parent, new Vector3(0f, 0.55f, 2.24f), Quaternion.identity, new Vector3(2.12f, 0.18f, 0.12f), playerAccentMaterial, false);
-            CreatePrimitive("Rear Bumper Blue Lip", PrimitiveType.Cube, parent, new Vector3(0f, 0.55f, -2.24f), Quaternion.identity, new Vector3(2.12f, 0.18f, 0.12f), playerSecondaryMaterial, false);
-            CreatePrimitive("Rear Hatch Orange Panel", PrimitiveType.Cube, parent, new Vector3(0f, 0.84f, -2.24f), Quaternion.identity, new Vector3(1.38f, 0.36f, 0.09f), playerAccentMaterial, false);
-            CreatePrimitive("Rear Hatch Blue Tag", PrimitiveType.Cube, parent, new Vector3(0f, 0.86f, -2.295f), Quaternion.identity, new Vector3(0.46f, 0.12f, 0.06f), playerSecondaryMaterial, false);
-            CreatePrimitive("Rear Deck Orange Print Block", PrimitiveType.Cube, parent, new Vector3(0.28f, 1.05f, -1.54f), Quaternion.Euler(0f, 8f, 0f), new Vector3(1.02f, 0.1f, 1.22f), playerAccentMaterial, false);
-            CreatePrimitive("Rear Deck Blue Print Block", PrimitiveType.Cube, parent, new Vector3(-0.56f, 1.06f, -1.44f), Quaternion.Euler(0f, 8f, 0f), new Vector3(0.42f, 0.11f, 1.22f), playerSecondaryMaterial, false);
-            CreatePrimitive("Cabin Orange Sun Strip", PrimitiveType.Cube, parent, new Vector3(0f, 1.48f, 0.04f), Quaternion.identity, new Vector3(1.38f, 0.1f, 0.26f), playerAccentMaterial, false);
-            CreatePrimitive("Left Rear Orange Corner", PrimitiveType.Cube, parent, new Vector3(-1.18f, 0.91f, -1.62f), Quaternion.identity, new Vector3(0.08f, 0.42f, 0.74f), playerAccentMaterial, false);
-            CreatePrimitive("Right Rear Orange Corner", PrimitiveType.Cube, parent, new Vector3(1.18f, 0.91f, -1.62f), Quaternion.identity, new Vector3(0.08f, 0.42f, 0.74f), playerAccentMaterial, false);
-            CreatePrimitive("Rear Model Kit Stripe", PrimitiveType.Cube, parent, new Vector3(0f, 0.99f, -2.01f), Quaternion.identity, new Vector3(1.72f, 0.08f, 0.12f), playerAccentMaterial, false);
-            CreatePrimitive("Left Hood Vent Ink", PrimitiveType.Cube, parent, new Vector3(-0.62f, 1.1f, 0.58f), Quaternion.Euler(0f, 0f, 0f), new Vector3(0.36f, 0.06f, 0.08f), inkMaterial, false);
-            CreatePrimitive("Right Hood Vent Ink", PrimitiveType.Cube, parent, new Vector3(0.62f, 1.1f, 0.58f), Quaternion.Euler(0f, 0f, 0f), new Vector3(0.36f, 0.06f, 0.08f), inkMaterial, false);
-            CreatePrimitive("Cabin Rear Ink Shelf", PrimitiveType.Cube, parent, new Vector3(0f, 1.29f, -1.22f), Quaternion.identity, new Vector3(1.55f, 0.12f, 0.18f), inkMaterial, false);
+            float front = profile.FrontZ + 0.018f * profile.scale.z;
+            float rear = profile.RearZ - 0.018f * profile.scale.z;
+            CreatePrimitive("Retro Front Black Grille", PrimitiveType.Cube, parent, new Vector3(0f, profile.rockerY + 0.21f * profile.scale.y, front), Quaternion.identity, new Vector3(profile.halfWidth * 1.26f, 0.2f * profile.scale.y, 0.07f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive("Retro Front Grille Slat A", PrimitiveType.Cube, parent, new Vector3(0f, profile.rockerY + 0.27f * profile.scale.y, front + 0.04f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 1.08f, 0.032f * profile.scale.y, 0.04f * profile.scale.z), playerSecondaryMaterial, false);
+            CreatePrimitive("Retro Front Grille Slat B", PrimitiveType.Cube, parent, new Vector3(0f, profile.rockerY + 0.16f * profile.scale.y, front + 0.045f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 1.08f, 0.032f * profile.scale.y, 0.04f * profile.scale.z), playerSecondaryMaterial, false);
+            CreatePrimitive("Retro Left Headlight", PrimitiveType.Cube, parent, new Vector3(-profile.halfWidth * 0.64f, profile.beltY - 0.08f * profile.scale.y, front + 0.05f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 0.34f, 0.17f * profile.scale.y, 0.07f * profile.scale.z), glassMaterial, false);
+            CreatePrimitive("Retro Right Headlight", PrimitiveType.Cube, parent, new Vector3(profile.halfWidth * 0.64f, profile.beltY - 0.08f * profile.scale.y, front + 0.05f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 0.34f, 0.17f * profile.scale.y, 0.07f * profile.scale.z), glassMaterial, false);
+            CreatePrimitive("Retro Left Turn Light Stack", PrimitiveType.Cube, parent, new Vector3(-profile.halfWidth * 0.9f, profile.rockerY + 0.11f * profile.scale.y, front + 0.055f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 0.18f, 0.1f * profile.scale.y, 0.055f * profile.scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Retro Right Turn Light Stack", PrimitiveType.Cube, parent, new Vector3(profile.halfWidth * 0.9f, profile.rockerY + 0.11f * profile.scale.y, front + 0.055f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 0.18f, 0.1f * profile.scale.y, 0.055f * profile.scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Retro Left Tail Light", PrimitiveType.Cube, parent, new Vector3(-profile.halfWidth * 0.58f, profile.beltY - 0.13f * profile.scale.y, rear), Quaternion.identity, new Vector3(profile.halfWidth * 0.34f, 0.16f * profile.scale.y, 0.07f * profile.scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Retro Right Tail Light", PrimitiveType.Cube, parent, new Vector3(profile.halfWidth * 0.58f, profile.beltY - 0.13f * profile.scale.y, rear), Quaternion.identity, new Vector3(profile.halfWidth * 0.34f, 0.16f * profile.scale.y, 0.07f * profile.scale.z), playerAccentMaterial, false);
+            CreatePrimitive("Retro Black Rear Plate", PrimitiveType.Cube, parent, new Vector3(0f, profile.beltY - 0.07f * profile.scale.y, rear - 0.02f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 0.58f, 0.16f * profile.scale.y, 0.055f * profile.scale.z), inkMaterial, false);
+        }
 
-            LowPolyMeshFactory.CreatePrism("Left Door Number Disc", parent, 12, new Vector3(-1.22f, 0.86f, -0.18f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.72f, 0.72f, 0.055f), playerMaterial, false);
-            LowPolyMeshFactory.CreatePrism("Right Door Number Disc", parent, 12, new Vector3(1.22f, 0.86f, -0.18f), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.72f, 0.72f, 0.055f), playerMaterial, false);
-            CreatePrimitive("Left Door Number Bar", PrimitiveType.Cube, parent, new Vector3(-1.25f, 0.86f, -0.18f), Quaternion.identity, new Vector3(0.08f, 0.1f, 0.52f), inkMaterial, false);
-            CreatePrimitive("Right Door Number Bar", PrimitiveType.Cube, parent, new Vector3(1.25f, 0.86f, -0.18f), Quaternion.identity, new Vector3(0.08f, 0.1f, 0.52f), inkMaterial, false);
+        private void CreateRoundedMachineCaps(Transform parent, RetroCarVisualProfile profile)
+        {
+            CreateOutlinedChamferedBox(parent, "Retro Front Bumper Bar", new Vector3(0f, profile.rockerY - 0.02f * profile.scale.y, profile.FrontZ + 0.04f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 1.86f, 0.22f * profile.scale.y, 0.2f * profile.scale.z), playerAccentMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.08f);
+            CreateOutlinedChamferedBox(parent, "Retro Rear Bumper Bar", new Vector3(0f, profile.rockerY - 0.02f * profile.scale.y, profile.RearZ - 0.04f * profile.scale.z), Quaternion.identity, new Vector3(profile.halfWidth * 1.82f, 0.22f * profile.scale.y, 0.2f * profile.scale.z), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.08f);
+            CreateOutlinedChamferedBox(parent, "Retro Left Rocker Skirt", new Vector3(-profile.halfWidth - 0.025f * profile.scale.x, profile.rockerY - 0.05f * profile.scale.y, -0.08f * profile.scale.z), Quaternion.identity, new Vector3(0.18f * profile.scale.x, 0.2f * profile.scale.y, profile.length * 0.68f), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.07f);
+            CreateOutlinedChamferedBox(parent, "Retro Right Rocker Skirt", new Vector3(profile.halfWidth + 0.025f * profile.scale.x, profile.rockerY - 0.05f * profile.scale.y, -0.08f * profile.scale.z), Quaternion.identity, new Vector3(0.18f * profile.scale.x, 0.2f * profile.scale.y, profile.length * 0.68f), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.07f);
+        }
+
+        private void CreateRetroSideMirrors(Transform parent, RetroCarVisualProfile profile)
+        {
+            CreateOutlinedChamferedBox(parent, "Left Retro Mirror", new Vector3(-profile.halfWidth - 0.13f * profile.scale.x, profile.beltY + 0.22f * profile.scale.y, profile.cabinFrontZ + 0.15f * profile.scale.z), Quaternion.Euler(0f, 0f, -8f), new Vector3(0.16f * profile.scale.x, 0.13f * profile.scale.y, 0.3f * profile.scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.04f);
+            CreateOutlinedChamferedBox(parent, "Right Retro Mirror", new Vector3(profile.halfWidth + 0.13f * profile.scale.x, profile.beltY + 0.22f * profile.scale.y, profile.cabinFrontZ + 0.15f * profile.scale.z), Quaternion.Euler(0f, 0f, 8f), new Vector3(0.16f * profile.scale.x, 0.13f * profile.scale.y, 0.3f * profile.scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.04f);
+        }
+
+        private void CreateRallyLivery(Transform parent, RetroCarVisualProfile profile)
+        {
+            float hoodY = profile.hoodY + 0.035f * profile.scale.y;
+            float hoodFront = profile.FrontZ - 0.55f * profile.scale.z;
+            float hoodRear = profile.cabinFrontZ + 0.08f * profile.scale.z;
+            CreatePanelWithBacker(parent, "Retro Hood Wide Graphic", new Vector3(-profile.halfWidth * 0.68f, hoodY, hoodFront), new Vector3(-profile.halfWidth * 0.18f, hoodY + 0.01f * profile.scale.y, hoodFront + 0.08f * profile.scale.z), new Vector3(-profile.halfWidth * 0.02f, hoodY + 0.02f * profile.scale.y, hoodRear), new Vector3(-profile.halfWidth * 0.54f, hoodY + 0.01f * profile.scale.y, hoodRear - 0.06f * profile.scale.z), playerSecondaryMaterial, 1.035f);
+            CreatePanelWithBacker(parent, "Retro Hood Accent Graphic", new Vector3(profile.halfWidth * 0.02f, hoodY + 0.02f * profile.scale.y, hoodFront + 0.04f * profile.scale.z), new Vector3(profile.halfWidth * 0.5f, hoodY, hoodFront + 0.1f * profile.scale.z), new Vector3(profile.halfWidth * 0.34f, hoodY + 0.02f * profile.scale.y, hoodRear), new Vector3(profile.halfWidth * -0.08f, hoodY + 0.025f * profile.scale.y, hoodRear - 0.08f * profile.scale.z), playerAccentMaterial, 1.035f);
+            CreatePrimitive("Retro Roof Number Slash", PrimitiveType.Cube, parent, new Vector3(0.04f * profile.scale.x, profile.roofY + 0.085f * profile.scale.y, Mathf.Lerp(profile.cabinFrontZ, profile.cabinRearZ, 0.55f)), Quaternion.Euler(0f, 0f, -18f), new Vector3(0.18f * profile.scale.x, 0.055f * profile.scale.y, 0.62f * profile.scale.z), playerSecondaryMaterial, false);
+
+            CreateSideLivery(parent, profile, -1f);
+            CreateSideLivery(parent, profile, 1f);
+
+            CreatePrimitive("Left Hood Vent Ink", PrimitiveType.Cube, parent, new Vector3(-profile.halfWidth * 0.46f, hoodY + 0.02f * profile.scale.y, profile.cabinFrontZ + 0.34f * profile.scale.z), Quaternion.identity, new Vector3(0.32f * profile.scale.x, 0.045f * profile.scale.y, 0.08f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive("Right Hood Vent Ink", PrimitiveType.Cube, parent, new Vector3(profile.halfWidth * 0.46f, hoodY + 0.02f * profile.scale.y, profile.cabinFrontZ + 0.34f * profile.scale.z), Quaternion.identity, new Vector3(0.32f * profile.scale.x, 0.045f * profile.scale.y, 0.08f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive("Cabin Rear Ink Shelf", PrimitiveType.Cube, parent, new Vector3(0f, profile.deckY + 0.28f * profile.scale.y, profile.cabinRearZ - 0.32f * profile.scale.z), Quaternion.identity, new Vector3(profile.cabinHalfWidth * 2f, 0.09f * profile.scale.y, 0.15f * profile.scale.z), inkMaterial, false);
+        }
+
+        private void CreateSideLivery(Transform parent, RetroCarVisualProfile profile, float side)
+        {
+            float x = side * (profile.halfWidth + 0.038f * profile.scale.x);
+            float sign = Mathf.Sign(side);
+            string prefix = side < 0f ? "Left" : "Right";
+            CreatePanelWithBacker(
+                parent,
+                prefix + " Door Bold Graphic",
+                new Vector3(x, profile.rockerY + 0.08f * profile.scale.y, profile.cabinFrontZ - 0.04f * profile.scale.z),
+                new Vector3(x, profile.rockerY + 0.08f * profile.scale.y, profile.cabinRearZ - 0.22f * profile.scale.z),
+                new Vector3(x, profile.beltY - 0.08f * profile.scale.y, profile.cabinRearZ - 0.04f * profile.scale.z),
+                new Vector3(x, profile.beltY - 0.02f * profile.scale.y, profile.cabinFrontZ + 0.22f * profile.scale.z),
+                playerSecondaryMaterial,
+                1.035f);
+
+            CreatePanelWithBacker(
+                parent,
+                prefix + " Rear Quarter Slash",
+                new Vector3(x + sign * 0.006f, profile.rockerY + 0.1f * profile.scale.y, profile.rearWheelZ - 0.18f * profile.scale.z),
+                new Vector3(x + sign * 0.006f, profile.rockerY + 0.16f * profile.scale.y, profile.RearZ + 0.42f * profile.scale.z),
+                new Vector3(x + sign * 0.006f, profile.beltY + 0.02f * profile.scale.y, profile.RearZ + 0.76f * profile.scale.z),
+                new Vector3(x + sign * 0.006f, profile.beltY - 0.05f * profile.scale.y, profile.rearWheelZ + 0.42f * profile.scale.z),
+                playerAccentMaterial,
+                1.03f);
+
+            LowPolyMeshFactory.CreatePrism(prefix + " Door Number Disc", parent, 12, new Vector3(x + sign * 0.014f, profile.rockerY + 0.34f * profile.scale.y, Mathf.Lerp(profile.cabinFrontZ, profile.cabinRearZ, 0.52f)), Quaternion.Euler(0f, 90f, 0f), new Vector3(0.58f * profile.scale.x, 0.58f * profile.scale.y, 0.055f * profile.scale.x), playerMaterial, false);
+            CreatePrimitive(prefix + " Door Number Bar", PrimitiveType.Cube, parent, new Vector3(x + sign * 0.026f, profile.rockerY + 0.34f * profile.scale.y, Mathf.Lerp(profile.cabinFrontZ, profile.cabinRearZ, 0.52f)), Quaternion.identity, new Vector3(0.06f * profile.scale.x, 0.1f * profile.scale.y, 0.44f * profile.scale.z), inkMaterial, false);
+            CreatePrimitive(prefix + " Tiny Fake Sponsor A", PrimitiveType.Cube, parent, new Vector3(x + sign * 0.02f, profile.rockerY + 0.06f * profile.scale.y, profile.cabinFrontZ - 0.48f * profile.scale.z), Quaternion.identity, new Vector3(0.055f * profile.scale.x, 0.07f * profile.scale.y, 0.42f * profile.scale.z), playerAccentMaterial, false);
+            CreatePrimitive(prefix + " Tiny Fake Sponsor B", PrimitiveType.Cube, parent, new Vector3(x + sign * 0.02f, profile.rockerY + 0.06f * profile.scale.y, profile.cabinFrontZ - 0.88f * profile.scale.z), Quaternion.identity, new Vector3(0.055f * profile.scale.x, 0.07f * profile.scale.y, 0.28f * profile.scale.z), playerSecondaryMaterial, false);
         }
 
         private WheelCollider CreateWheelCollider(Transform parent, string name, Vector3 localPosition, float radius = 0.38f, float suspensionDistance = 0.28f)
@@ -2523,6 +3014,89 @@ namespace GTX.Core
             CreateOutlinedWedge(parent, name, localPosition, localRotation, new Vector3(0.34f, 0.54f, 2.4f), playerAccentMaterial, 1.08f);
         }
 
+        private void CreateVehicleClassVisualKit(Transform parent, VectorSSVehicleDefinition vehicle, Vector3 scale)
+        {
+            switch (vehicle.id)
+            {
+                case VectorSSVehicleId.Hammer:
+                    CreateHammerVisualKit(parent, scale);
+                    break;
+                case VectorSSVehicleId.Needle:
+                    CreateNeedleVisualKit(parent, scale);
+                    break;
+                case VectorSSVehicleId.Surge:
+                    CreateSurgeVisualKit(parent, scale);
+                    break;
+                case VectorSSVehicleId.Hauler:
+                    CreatePickupVisualKit(parent, scale);
+                    break;
+            }
+        }
+
+        private void CreateHammerVisualKit(Transform parent, Vector3 scale)
+        {
+            CreateOutlinedChamferedBox(parent, "Hammer Bolt-On Ram Plate", new Vector3(0f, 0.72f, 2.58f * scale.z), Quaternion.identity, new Vector3(2.48f * scale.x, 0.42f, 0.26f), playerSecondaryMaterial, VectrStyleTokens.OuterOutlineMultiplier, 0.08f);
+            CreateOutlinedChamferedBox(parent, "Hammer Hood Scoop", new Vector3(0f, 1.28f, 0.8f * scale.z), Quaternion.identity, new Vector3(0.84f, 0.28f, 0.92f), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.07f);
+            CreateOutlinedChamferedBox(parent, "Hammer Wide Front Fender L", new Vector3(-1.38f * scale.x, 0.78f, 1.28f * scale.z), Quaternion.identity, new Vector3(0.38f, 0.46f, 1.28f), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.11f);
+            CreateOutlinedChamferedBox(parent, "Hammer Wide Front Fender R", new Vector3(1.38f * scale.x, 0.78f, 1.28f * scale.z), Quaternion.identity, new Vector3(0.38f, 0.46f, 1.28f), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.11f);
+            CreateOutlinedChamferedBox(parent, "Hammer Wide Rear Fender L", new Vector3(-1.38f * scale.x, 0.78f, -1.26f * scale.z), Quaternion.identity, new Vector3(0.42f, 0.5f, 1.36f), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.11f);
+            CreateOutlinedChamferedBox(parent, "Hammer Wide Rear Fender R", new Vector3(1.38f * scale.x, 0.78f, -1.26f * scale.z), Quaternion.identity, new Vector3(0.42f, 0.5f, 1.36f), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.11f);
+            CreatePrimitive("Hammer Mudflap FL", PrimitiveType.Cube, parent, new Vector3(-1.28f * scale.x, 0.34f, 1.92f * scale.z), Quaternion.Euler(-8f, 0f, 0f), new Vector3(0.42f, 0.52f, 0.06f), inkMaterial, false);
+            CreatePrimitive("Hammer Mudflap FR", PrimitiveType.Cube, parent, new Vector3(1.28f * scale.x, 0.34f, 1.92f * scale.z), Quaternion.Euler(-8f, 0f, 0f), new Vector3(0.42f, 0.52f, 0.06f), inkMaterial, false);
+            CreatePrimitive("Hammer Mudflap RL", PrimitiveType.Cube, parent, new Vector3(-1.28f * scale.x, 0.34f, -1.96f * scale.z), Quaternion.Euler(8f, 0f, 0f), new Vector3(0.42f, 0.52f, 0.06f), inkMaterial, false);
+            CreatePrimitive("Hammer Mudflap RR", PrimitiveType.Cube, parent, new Vector3(1.28f * scale.x, 0.34f, -1.96f * scale.z), Quaternion.Euler(8f, 0f, 0f), new Vector3(0.42f, 0.52f, 0.06f), inkMaterial, false);
+            for (int i = 0; i < 4; i++)
+            {
+                float x = -0.54f + i * 0.36f;
+                CreateOutlinedPrism(parent, "Hammer Rally Lamp " + i, 12, new Vector3(x, 0.92f, 2.42f * scale.z), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.24f, 0.24f, 0.08f), glassMaterial, VectrStyleTokens.DetailOutlineMultiplier);
+            }
+        }
+
+        private void CreateNeedleVisualKit(Transform parent, Vector3 scale)
+        {
+            CreateOutlinedChamferedBox(parent, "Needle Low Drift Splitter", new Vector3(0f, 0.46f, 2.48f * scale.z), Quaternion.identity, new Vector3(2.28f * scale.x, 0.12f, 0.72f), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.05f);
+            CreateOutlinedChamferedBox(parent, "Needle Tall Drift Wing", new Vector3(0f, 1.52f, -2.28f * scale.z), Quaternion.identity, new Vector3(2.3f * scale.x, 0.16f, 0.32f), playerAccentMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.05f);
+            CreatePrimitive("Needle Wing Left Upright", PrimitiveType.Cube, parent, new Vector3(-0.72f * scale.x, 1.16f, -2.16f * scale.z), Quaternion.Euler(0f, 0f, -8f), new Vector3(0.08f, 0.72f, 0.12f), inkMaterial, false);
+            CreatePrimitive("Needle Wing Right Upright", PrimitiveType.Cube, parent, new Vector3(0.72f * scale.x, 1.16f, -2.16f * scale.z), Quaternion.Euler(0f, 0f, 8f), new Vector3(0.08f, 0.72f, 0.12f), inkMaterial, false);
+            CreatePrimitive("Needle Magenta Slash L", PrimitiveType.Cube, parent, new Vector3(-1.16f * scale.x, 0.95f, -0.1f), Quaternion.Euler(0f, 0f, 18f), new Vector3(0.07f, 0.22f, 2.3f), playerAccentMaterial, false);
+            CreatePrimitive("Needle Magenta Slash R", PrimitiveType.Cube, parent, new Vector3(1.16f * scale.x, 0.95f, -0.1f), Quaternion.Euler(0f, 0f, -18f), new Vector3(0.07f, 0.22f, 2.3f), playerAccentMaterial, false);
+            CreatePrimitive("Needle Cyan Tire Letter FL", PrimitiveType.Cube, parent, new Vector3(-1.23f * scale.x, 0.83f, 1.38f * scale.z), Quaternion.identity, new Vector3(0.055f, 0.08f, 0.58f), playerSecondaryMaterial, false);
+            CreatePrimitive("Needle Cyan Tire Letter FR", PrimitiveType.Cube, parent, new Vector3(1.23f * scale.x, 0.83f, 1.38f * scale.z), Quaternion.identity, new Vector3(0.055f, 0.08f, 0.58f), playerSecondaryMaterial, false);
+        }
+
+        private void CreateSurgeVisualKit(Transform parent, Vector3 scale)
+        {
+            CreateOutlinedWedge(parent, "Surge Active Nose Duct", new Vector3(0f, 0.94f, 1.92f * scale.z), Quaternion.identity, new Vector3(1.52f, 0.32f, 0.86f), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier);
+            CreatePrimitive("Surge Cyan Intake L", PrimitiveType.Cube, parent, new Vector3(-0.72f * scale.x, 0.86f, 2.12f * scale.z), Quaternion.identity, new Vector3(0.42f, 0.08f, 0.12f), playerMaterial, false);
+            CreatePrimitive("Surge Cyan Intake R", PrimitiveType.Cube, parent, new Vector3(0.72f * scale.x, 0.86f, 2.12f * scale.z), Quaternion.identity, new Vector3(0.42f, 0.08f, 0.12f), playerMaterial, false);
+            CreateOutlinedWedge(parent, "Surge Aero Fin L", new Vector3(-1.26f * scale.x, 1.04f, -1.48f * scale.z), Quaternion.Euler(0f, 0f, -14f), new Vector3(0.22f, 0.56f, 1.5f), playerAccentMaterial, VectrStyleTokens.PanelOutlineMultiplier);
+            CreateOutlinedWedge(parent, "Surge Aero Fin R", new Vector3(1.26f * scale.x, 1.04f, -1.48f * scale.z), Quaternion.Euler(0f, 180f, 14f), new Vector3(0.22f, 0.56f, 1.5f), playerAccentMaterial, VectrStyleTokens.PanelOutlineMultiplier);
+            CreatePrimitive("Surge Violet Battery Spine", PrimitiveType.Cube, parent, new Vector3(0f, 1.15f, -0.2f), Quaternion.identity, new Vector3(0.34f, 0.12f, 2.8f), playerAccentMaterial, false);
+            CreatePrimitive("Surge White Charge Tick A", PrimitiveType.Cube, parent, new Vector3(-0.22f, 1.24f, -0.82f), Quaternion.Euler(0f, 0f, 24f), new Vector3(0.08f, 0.08f, 0.54f), playerSecondaryMaterial, false);
+            CreatePrimitive("Surge White Charge Tick B", PrimitiveType.Cube, parent, new Vector3(0.22f, 1.24f, 0.18f), Quaternion.Euler(0f, 0f, -24f), new Vector3(0.08f, 0.08f, 0.54f), playerSecondaryMaterial, false);
+        }
+
+        private void CreatePickupVisualKit(Transform parent, Vector3 scale)
+        {
+            CreateOutlinedChamferedBox(parent, "Hauler Open Bed Ink Floor", new Vector3(0f, 0.98f * scale.y, -1.28f * scale.z), Quaternion.identity, new Vector3(1.74f * scale.x, 0.08f * scale.y, 1.64f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.04f);
+            CreateOutlinedChamferedBox(parent, "Hauler Left Bed Rail", new Vector3(-1.02f * scale.x, 1.22f * scale.y, -1.28f * scale.z), Quaternion.identity, new Vector3(0.16f * scale.x, 0.34f * scale.y, 1.72f * scale.z), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.05f);
+            CreateOutlinedChamferedBox(parent, "Hauler Right Bed Rail", new Vector3(1.02f * scale.x, 1.22f * scale.y, -1.28f * scale.z), Quaternion.identity, new Vector3(0.16f * scale.x, 0.34f * scale.y, 1.72f * scale.z), playerSecondaryMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.05f);
+            CreateOutlinedChamferedBox(parent, "Hauler Tailgate Armor", new Vector3(0f, 0.94f * scale.y, -2.4f * scale.z), Quaternion.identity, new Vector3(2.04f * scale.x, 0.5f * scale.y, 0.18f * scale.z), playerAccentMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.08f);
+            CreateOutlinedChamferedBox(parent, "Hauler Heavy Front Push Bar", new Vector3(0f, 0.72f * scale.y, 2.52f * scale.z), Quaternion.identity, new Vector3(2.18f * scale.x, 0.38f * scale.y, 0.2f * scale.z), playerSecondaryMaterial, VectrStyleTokens.OuterOutlineMultiplier, 0.07f);
+
+            for (int i = 0; i < 2; i++)
+            {
+                float side = i == 0 ? -1f : 1f;
+                CreateOutlinedChamferedBox(parent, "Hauler Roll Bar Upright " + i, new Vector3(side * 0.72f * scale.x, 1.48f * scale.y, -0.52f * scale.z), Quaternion.Euler(0f, 0f, side * 6f), new Vector3(0.12f * scale.x, 0.82f * scale.y, 0.14f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.025f);
+                CreateOutlinedChamferedBox(parent, "Hauler Wide Fender " + i, new Vector3(side * 1.34f * scale.x, 0.82f * scale.y, -1.38f * scale.z), Quaternion.identity, new Vector3(0.34f * scale.x, 0.42f * scale.y, 1.18f * scale.z), playerMaterial, VectrStyleTokens.PanelOutlineMultiplier, 0.1f);
+                CreatePrimitive("Hauler Bed Slash " + i, PrimitiveType.Cube, parent, new Vector3(side * 1.11f * scale.x, 1.12f * scale.y, -1.4f * scale.z), Quaternion.Euler(0f, 0f, side * 20f), new Vector3(0.07f * scale.x, 0.18f * scale.y, 1.18f * scale.z), playerAccentMaterial, false);
+            }
+
+            CreateOutlinedChamferedBox(parent, "Hauler Roll Bar Top", new Vector3(0f, 1.9f * scale.y, -0.52f * scale.z), Quaternion.identity, new Vector3(1.64f * scale.x, 0.1f * scale.y, 0.16f * scale.z), inkMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.025f);
+            CreateOutlinedChamferedBox(parent, "Hauler Roof Scoop", new Vector3(0f, 1.72f * scale.y, 0.12f * scale.z), Quaternion.identity, new Vector3(0.72f * scale.x, 0.18f * scale.y, 0.7f * scale.z), playerSecondaryMaterial, VectrStyleTokens.DetailOutlineMultiplier, 0.06f);
+            CreatePrimitive("Hauler Bed Cyan Cargo Light", PrimitiveType.Cube, parent, new Vector3(0f, 1.58f * scale.y, -0.56f * scale.z), Quaternion.identity, new Vector3(0.62f * scale.x, 0.07f * scale.y, 0.08f * scale.z), playerAccentMaterial, false);
+        }
+
         private GameObject CreateChamferedBox(string name, Transform parent, Vector3 localPosition, Quaternion localRotation, Vector3 localScale, Material material, bool keepCollider, float bevel)
         {
             return LowPolyMeshFactory.CreateChamferedBox(name, parent, localPosition, localRotation, localScale, material, keepCollider, bevel);
@@ -2581,13 +3155,22 @@ namespace GTX.Core
 
             if (material.HasProperty("_ShadowColor"))
             {
-                Color shadow = Color.Lerp(color, new Color(0.02f, 0.025f, 0.04f, color.a), 0.46f);
-                material.SetColor("_ShadowColor", shadow);
+                material.SetColor("_ShadowColor", VectrStyleTokens.ShadowFor(color));
+            }
+
+            if (material.HasProperty("_HighlightColor"))
+            {
+                material.SetColor("_HighlightColor", Color.Lerp(color, VectrStyleTokens.BoneWhite, 0.38f));
             }
 
             if (material.HasProperty("_Steps"))
             {
                 material.SetFloat("_Steps", 2f);
+            }
+
+            if (material.HasProperty("_RimThreshold"))
+            {
+                material.SetFloat("_RimThreshold", 0.78f);
             }
 
             return material;
@@ -2756,21 +3339,32 @@ namespace GTX.Core
                     return 0f;
                 }
 
-                int bestIndex = 0;
-                float bestDistance = float.MaxValue;
+                float bestSqrDistance = float.MaxValue;
+                float bestRouteDistance = 0f;
                 Vector2 target = new Vector2(worldPosition.x, worldPosition.z);
-                for (int i = 0; i < samples.Length; i++)
+                for (int i = 0; i < samples.Length - 1; i++)
                 {
-                    Vector2 sample = new Vector2(samples[i].x, samples[i].z);
-                    float distance = Vector2.SqrMagnitude(target - sample);
-                    if (distance < bestDistance)
+                    Vector2 start = new Vector2(samples[i].x, samples[i].z);
+                    Vector2 end = new Vector2(samples[i + 1].x, samples[i + 1].z);
+                    Vector2 segment = end - start;
+                    float segmentSqrLength = segment.sqrMagnitude;
+                    if (segmentSqrLength < 0.001f)
                     {
-                        bestDistance = distance;
-                        bestIndex = i;
+                        continue;
+                    }
+
+                    float t = Mathf.Clamp01(Vector2.Dot(target - start, segment) / segmentSqrLength);
+                    Vector2 closest = start + segment * t;
+                    float sqrDistance = Vector2.SqrMagnitude(target - closest);
+                    if (sqrDistance < bestSqrDistance)
+                    {
+                        bestSqrDistance = sqrDistance;
+                        float segmentLength = cumulativeDistances[i + 1] - cumulativeDistances[i];
+                        bestRouteDistance = cumulativeDistances[i] + segmentLength * t;
                     }
                 }
 
-                return cumulativeDistances[Mathf.Clamp(bestIndex, 0, cumulativeDistances.Length - 1)];
+                return totalLength > 0.01f ? Mathf.Repeat(bestRouteDistance, totalLength) : bestRouteDistance;
             }
         }
 

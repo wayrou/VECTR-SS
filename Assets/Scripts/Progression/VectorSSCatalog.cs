@@ -118,6 +118,34 @@ namespace GTX.Progression
                     stability = 0.82f,
                     centerOfMassOffset = new Vector3(0f, -0.16f, -0.08f)
                 }
+            },
+            new VectorSSGarageVehicleDefinition
+            {
+                id = VectorSSVehicleId.Hauler,
+                displayName = "Hauler",
+                kind = VectorSSVehicleKind.Car,
+                description = "Low-poly pickup truck: utility contact platform with stable exits and heavy bed armor.",
+                startingUnlocked = true,
+                unlockCost = new VectorSSResourceWallet(125, 60, 95),
+                rewardMultiplier = 1.06f,
+                baseStats = new VectorSSTuningStats
+                {
+                    mass = 1.18f,
+                    acceleration = 0.98f,
+                    topSpeed = 0.95f,
+                    grip = 1.12f,
+                    steering = 0.9f,
+                    brake = 1.1f,
+                    boostCapacity = 0.94f,
+                    boostPower = 0.92f,
+                    cooling = 1.08f,
+                    heat = 0.94f,
+                    downforce = 1.04f,
+                    ram = 1.22f,
+                    drift = 0.9f,
+                    stability = 1.18f,
+                    centerOfMassOffset = new Vector3(0f, -0.08f, -0.1f)
+                }
             }
         };
 

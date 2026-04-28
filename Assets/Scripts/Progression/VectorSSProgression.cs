@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using GTX.Data;
+using GTX.Visuals;
 using UnityEngine;
 
 namespace GTX.Progression
@@ -29,7 +30,8 @@ namespace GTX.Progression
         Hammer,
         Needle,
         Surge,
-        Razor
+        Razor,
+        Hauler
     }
 
     public enum VectorSSVehicleClass
@@ -37,7 +39,8 @@ namespace GTX.Progression
         Strike,
         Drift,
         Volt,
-        Bike
+        Bike,
+        Pickup
     }
 
     public enum VectorSSModuleCategory
@@ -493,9 +496,9 @@ namespace GTX.Progression
                 vehicleClass = VectorSSVehicleClass.Strike,
                 role = "Heavy combat / ramming / stability",
                 primaryResource = "Metal",
-                bodyColor = new Color(0.92f, 0.83f, 0.58f, 1f),
-                accentColor = new Color(0.96f, 0.25f, 0.06f, 1f),
-                secondaryColor = new Color(0.08f, 0.19f, 0.44f, 1f),
+                bodyColor = VectrStyleTokens.VehicleBody(VectorSSVehicleId.Hammer),
+                accentColor = VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Hammer),
+                secondaryColor = VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Hammer),
                 massMultiplier = 1.24f,
                 engineMultiplier = 1.05f,
                 steeringMultiplier = 0.82f,
@@ -519,9 +522,9 @@ namespace GTX.Progression
                 vehicleClass = VectorSSVehicleClass.Drift,
                 role = "Technical cornering / clutch kicks / Flow",
                 primaryResource = "Rubber",
-                bodyColor = new Color(0.88f, 0.90f, 0.78f, 1f),
-                accentColor = new Color(0.06f, 0.55f, 0.95f, 1f),
-                secondaryColor = new Color(0.98f, 0.38f, 0.08f, 1f),
+                bodyColor = VectrStyleTokens.VehicleBody(VectorSSVehicleId.Needle),
+                accentColor = VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Needle),
+                secondaryColor = VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Needle),
                 massMultiplier = 0.88f,
                 engineMultiplier = 0.98f,
                 steeringMultiplier = 1.38f,
@@ -545,9 +548,9 @@ namespace GTX.Progression
                 vehicleClass = VectorSSVehicleClass.Volt,
                 role = "Boost / speed / heat risk",
                 primaryResource = "Plastic + Metal",
-                bodyColor = new Color(0.15f, 0.48f, 0.95f, 1f),
-                accentColor = new Color(1f, 0.86f, 0.08f, 1f),
-                secondaryColor = new Color(0.03f, 0.05f, 0.08f, 1f),
+                bodyColor = VectrStyleTokens.VehicleBody(VectorSSVehicleId.Surge),
+                accentColor = VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Surge),
+                secondaryColor = VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Surge),
                 massMultiplier = 0.94f,
                 engineMultiplier = 1.12f,
                 steeringMultiplier = 1.04f,
@@ -571,9 +574,9 @@ namespace GTX.Progression
                 vehicleClass = VectorSSVehicleClass.Bike,
                 role = "Agility / near-misses / shortcuts / high-risk precision",
                 primaryResource = "Rubber + Plastic",
-                bodyColor = new Color(0.98f, 0.92f, 0.72f, 1f),
-                accentColor = new Color(0.98f, 0.18f, 0.12f, 1f),
-                secondaryColor = new Color(0.04f, 0.68f, 0.86f, 1f),
+                bodyColor = VectrStyleTokens.VehicleBody(VectorSSVehicleId.Razor),
+                accentColor = VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Razor),
+                secondaryColor = VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Razor),
                 massMultiplier = 0.54f,
                 engineMultiplier = 1.18f,
                 steeringMultiplier = 1.62f,
@@ -591,6 +594,34 @@ namespace GTX.Progression
                 controlSlots = 3,
                 combatSlots = 1,
                 utilitySlots = 2
+            },
+            new VectorSSVehicleDefinition
+            {
+                id = VectorSSVehicleId.Hauler,
+                displayName = "Hauler",
+                fullName = "Vector SS-P \"Hauler\"",
+                vehicleClass = VectorSSVehicleClass.Pickup,
+                role = "Pickup truck / utility combat / stable exits",
+                primaryResource = "Metal + Rubber",
+                bodyColor = VectrStyleTokens.VehicleBody(VectorSSVehicleId.Hauler),
+                accentColor = VectrStyleTokens.VehicleAccent(VectorSSVehicleId.Hauler),
+                secondaryColor = VectrStyleTokens.VehicleSecondary(VectorSSVehicleId.Hauler),
+                massMultiplier = 1.18f,
+                engineMultiplier = 1.03f,
+                steeringMultiplier = 0.9f,
+                gripMultiplier = 1.12f,
+                boostMultiplier = 0.9f,
+                ramMultiplier = 1.22f,
+                impactResistance = 1.26f,
+                nearMissFlowMultiplier = 0.92f,
+                airControlMultiplier = 0.9f,
+                visualScale = new Vector3(1.1f, 1.08f, 1.18f),
+                colliderSize = new Vector3(2.38f, 1.08f, 5.12f),
+                colliderCenter = new Vector3(0f, 0.76f, -0.08f),
+                sensorSlots = 2,
+                controlSlots = 2,
+                combatSlots = 2,
+                utilitySlots = 1
             }
         };
 
@@ -605,9 +636,9 @@ namespace GTX.Progression
                 lapCount = 3,
                 baseReward = new VectorSSResources(32, 30, 30),
                 mapBonus = new VectorSSResources(14, 12, 12),
-                roadColor = new Color(0.17f, 0.19f, 0.21f, 1f),
-                groundColor = new Color(0.52f, 0.58f, 0.62f, 1f),
-                barrierColor = new Color(0.86f, 0.82f, 0.70f, 1f)
+                roadColor = VectrStyleTokens.MapRoad(VectorSSMapId.BlacklineCircuit),
+                groundColor = VectrStyleTokens.MapGround(VectorSSMapId.BlacklineCircuit),
+                barrierColor = VectrStyleTokens.MapBarrier(VectorSSMapId.BlacklineCircuit)
             },
             new VectorSSMapDefinition
             {
@@ -618,9 +649,9 @@ namespace GTX.Progression
                 lapCount = 3,
                 baseReward = new VectorSSResources(36, 22, 22),
                 mapBonus = new VectorSSResources(36, 8, 8),
-                roadColor = new Color(0.20f, 0.20f, 0.18f, 1f),
-                groundColor = new Color(0.44f, 0.37f, 0.30f, 1f),
-                barrierColor = new Color(0.64f, 0.60f, 0.52f, 1f)
+                roadColor = VectrStyleTokens.MapRoad(VectorSSMapId.ScraplineYard),
+                groundColor = VectrStyleTokens.MapGround(VectorSSMapId.ScraplineYard),
+                barrierColor = VectrStyleTokens.MapBarrier(VectorSSMapId.ScraplineYard)
             },
             new VectorSSMapDefinition
             {
@@ -631,9 +662,9 @@ namespace GTX.Progression
                 lapCount = 3,
                 baseReward = new VectorSSResources(24, 24, 38),
                 mapBonus = new VectorSSResources(8, 10, 38),
-                roadColor = new Color(0.18f, 0.19f, 0.20f, 1f),
-                groundColor = new Color(0.58f, 0.45f, 0.30f, 1f),
-                barrierColor = new Color(0.26f, 0.26f, 0.24f, 1f)
+                roadColor = VectrStyleTokens.MapRoad(VectorSSMapId.RubberRidge),
+                groundColor = VectrStyleTokens.MapGround(VectorSSMapId.RubberRidge),
+                barrierColor = VectrStyleTokens.MapBarrier(VectorSSMapId.RubberRidge)
             }
         };
 
@@ -1120,6 +1151,7 @@ namespace GTX.Progression
             tuning.driftLateralDamping *= Mathf.Lerp(0.86f, 1.2f, driftGrip01);
             tuning.driftHandbrakeEntryKick *= Mathf.Lerp(1.16f, 0.92f, driftGrip01);
             tuning.driftHandbrakeEntryDuration *= Mathf.Lerp(1.12f, 0.94f, driftGrip01);
+            tuning.driftExitBoostForce *= Mathf.Lerp(0.94f, 1.18f, driftGrip01) * (profile.HasUpgrade("grip_tires_1") ? 1.1f : 1f);
             tuning.clutchTransferSharpness *= t.clutchBite * (profile.HasUpgrade("clutch_response_1") ? 1.18f : 1f);
             tuning.clutchKickSlipBoost *= Mathf.Lerp(0.82f, 1.28f, Mathf.InverseLerp(0.55f, 1.8f, t.clutchBite));
             tuning.boostTorqueMultiplier = 1f + (tuning.boostTorqueMultiplier - 1f) * vehicle.boostMultiplier * t.boostValve * (profile.HasUpgrade("boost_valve_1") ? 1.14f : 1f);
@@ -1172,6 +1204,7 @@ namespace GTX.Progression
                     tuning.driftHandbrakeEntryKick *= 1.08f;
                     tuning.driftHandbrakeEntryDuration *= 1.05f;
                     tuning.driftThrottleInfluence *= 1.08f;
+                    tuning.driftExitBoostForce *= 1.16f;
                     break;
                 case VectorSSVehicleId.Surge:
                     tuning.highSpeedSteeringStability *= 1.36f;
@@ -1188,6 +1221,15 @@ namespace GTX.Progression
                     tuning.driftHandbrakeEntryKick *= 1.08f;
                     tuning.driftHandbrakeEntryDuration *= 0.9f;
                     tuning.driftThrottleInfluence *= 0.82f;
+                    break;
+                case VectorSSVehicleId.Hauler:
+                    tuning.highSpeedSteeringStability *= 1.22f;
+                    tuning.driftSustain *= 0.78f;
+                    tuning.driftExitRecovery *= 1.18f;
+                    tuning.driftExitYawDamping *= 1.16f;
+                    tuning.driftLateralDamping *= 1.12f;
+                    tuning.driftHandbrakeEntryKick *= 0.9f;
+                    tuning.driftThrottleInfluence *= 0.92f;
                     break;
             }
         }

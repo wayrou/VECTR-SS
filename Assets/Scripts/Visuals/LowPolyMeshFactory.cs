@@ -97,8 +97,8 @@ namespace GTX.Visuals
                     continue;
                 }
 
-                Vector3 previous = centerline[Mathf.Max(0, i - 1)];
-                Vector3 next = centerline[Mathf.Min(count - 1, i + 1)];
+                Vector3 previous = closed && i == 0 ? centerline[count - 2] : centerline[Mathf.Max(0, i - 1)];
+                Vector3 next = closed && i == 0 ? centerline[1] : centerline[Mathf.Min(count - 1, i + 1)];
                 Vector3 tangent = next - previous;
                 tangent.y = 0f;
                 if (tangent.sqrMagnitude < 0.001f)

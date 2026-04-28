@@ -11,6 +11,9 @@ namespace GTX.Vehicle
         public float SlipAngle { get; private set; }
         public float EntryAmount { get; private set; }
         public float CounterSteerAmount { get; private set; }
+        public float TurnInAmount { get; private set; }
+        public bool SuccessfulExitThisFrame { get; private set; }
+        public float ExitBoostTimer { get; private set; }
         public bool ClutchKickActive => clutchKickTimer > 0f;
 
         private float clutchKickTimer;
@@ -18,6 +21,9 @@ namespace GTX.Vehicle
         private float entryKickDuration;
         private float entryKickDirection;
         private float exitAssistTimer;
+        private float driftDirection;
+        private float driftTime;
+        private float exitBoostCooldown;
         private float previousDriftAmount;
         private float previousClutch;
         private bool previousHandbrake;
@@ -29,11 +35,17 @@ namespace GTX.Vehicle
             SlipAngle = 0f;
             EntryAmount = 0f;
             CounterSteerAmount = 0f;
+            TurnInAmount = 0f;
+            SuccessfulExitThisFrame = false;
+            ExitBoostTimer = 0f;
             clutchKickTimer = 0f;
             entryKickTimer = 0f;
             entryKickDuration = 0f;
             entryKickDirection = 0f;
             exitAssistTimer = 0f;
+            driftDirection = 0f;
+            driftTime = 0f;
+            exitBoostCooldown = 0f;
             previousDriftAmount = 0f;
             previousClutch = 0f;
             previousHandbrake = false;
@@ -45,6 +57,10 @@ namespace GTX.Vehicle
             {
                 return;
             }
+
+            SuccessfulExitThisFrame = false;
+            ExitBoostTimer = Mathf.Max(0f, ExitBoostTimer - deltaTime);
+            exitBoostCooldown = Mathf.Max(0f, exitBoostCooldown - deltaTime);
 
             Vector3 localVelocity = body.transform.InverseTransformDirection(body.velocity);
             float speed = body.velocity.magnitude;
@@ -74,17 +90,51 @@ namespace GTX.Vehicle
             float steeringIntent = Mathf.Clamp01(Mathf.Abs(input.steer));
             float handbrake01 = input.handbrake ? Mathf.Lerp(0.45f, 1f, steeringIntent) : 0f;
             float kick01 = input.handbrake && ClutchKickActive ? Mathf.Max(0.72f, tuning.clutchKickSlipBoost) : 0f;
-            float throttleSustain = input.handbrake ? input.throttle * tuning.driftThrottleInfluence * Mathf.Clamp01(DriftAmount) : 0f;
-            float sustain01 = input.handbrake ? Mathf.Clamp01(Mathf.Max(slip01, throttleSustain) * tuning.driftSustain) : 0f;
+            float slipSign = ResolveDriftDirection();
+            CounterSteerAmount = Mathf.Clamp01(-slipSign * input.steer);
+            TurnInAmount = Mathf.Clamp01(slipSign * input.steer);
+            bool wantsSustain = previousDriftAmount > 0.12f && input.throttle > 0.18f && (TurnInAmount > 0.04f || steeringIntent < 0.18f || input.handbrake);
+            float throttleSustain = wantsSustain ? input.throttle * tuning.driftThrottleInfluence * Mathf.Clamp01(Mathf.Max(DriftAmount, 0.35f)) : 0f;
+            float steeringSustain = wantsSustain ? Mathf.Lerp(0.34f, 0.9f, Mathf.Max(TurnInAmount, 1f - CounterSteerAmount)) : 0f;
+            float sustain01 = wantsSustain ? Mathf.Clamp01(Mathf.Max(slip01, throttleSustain, steeringSustain) * tuning.driftSustain) : 0f;
             float intentionalSlip01 = input.handbrake || EntryAmount > 0f ? slip01 : 0f;
+            bool deliberateExit = previousDriftAmount > 0.12f && !input.handbrake && CounterSteerAmount > 0.18f;
             float target = speed >= tuning.driftMinSpeed ? Mathf.Clamp01(Mathf.Max(intentionalSlip01, handbrake01, kick01, sustain01)) : 0f;
+            if (deliberateExit)
+            {
+                target = Mathf.Min(target, Mathf.Lerp(previousDriftAmount, 0f, CounterSteerAmount));
+            }
 
             previousDriftAmount = DriftAmount;
-            DriftAmount = Mathf.MoveTowards(DriftAmount, target, deltaTime * (target > DriftAmount ? 8f : Mathf.Max(0.25f, tuning.driftExitRecovery)));
+            float exitRate = deliberateExit ? tuning.driftExitRecovery * Mathf.Lerp(1.35f, tuning.driftCounterSteerExitRate, CounterSteerAmount) : tuning.driftExitRecovery;
+            DriftAmount = Mathf.MoveTowards(DriftAmount, target, deltaTime * (target > DriftAmount ? 8f : Mathf.Max(0.25f, exitRate)));
             bool exitingDrift = previousDriftAmount > 0.2f && DriftAmount < previousDriftAmount - 0.001f;
             if (exitingDrift || (previousDriftAmount > 0.2f && DriftAmount <= 0.2f))
             {
                 exitAssistTimer = Mathf.Max(exitAssistTimer, tuning.driftExitHoldSeconds);
+            }
+
+            if (DriftAmount > 0.2f)
+            {
+                driftDirection = slipSign;
+                driftTime += deltaTime;
+            }
+            else if (exitAssistTimer <= 0f)
+            {
+                driftTime = 0f;
+            }
+
+            if (deliberateExit &&
+                previousDriftAmount > 0.56f &&
+                DriftAmount <= 0.36f &&
+                driftTime >= tuning.driftExitBoostMinDriftSeconds &&
+                speed >= tuning.driftMinSpeed + 1.5f &&
+                exitBoostCooldown <= 0f)
+            {
+                SuccessfulExitThisFrame = true;
+                ExitBoostTimer = tuning.driftExitBoostDuration;
+                exitBoostCooldown = 0.82f;
+                driftTime = 0f;
             }
 
             exitAssistTimer = Mathf.Max(0f, exitAssistTimer - deltaTime);
@@ -92,6 +142,7 @@ namespace GTX.Vehicle
             if (!IsDrifting && exitAssistTimer <= 0f)
             {
                 CounterSteerAmount = 0f;
+                TurnInAmount = 0f;
             }
         }
 
@@ -113,6 +164,8 @@ namespace GTX.Vehicle
             DriftAmount = Mathf.Max(DriftAmount, 0.62f);
             previousDriftAmount = DriftAmount;
             exitAssistTimer = 0f;
+            driftDirection = entryKickDirection;
+            driftTime = 0f;
             IsDrifting = true;
         }
 
@@ -125,9 +178,30 @@ namespace GTX.Vehicle
             }
 
             entryKickDirection = direction;
+            driftDirection = direction;
             entryKickDuration = Mathf.Max(0.05f, duration);
             entryKickTimer = entryKickDuration;
             exitAssistTimer = 0f;
+        }
+
+        private float ResolveDriftDirection()
+        {
+            if (Mathf.Abs(SlipAngle) > 1.2f)
+            {
+                return Mathf.Sign(SlipAngle);
+            }
+
+            if (Mathf.Abs(driftDirection) > 0.05f)
+            {
+                return Mathf.Sign(driftDirection);
+            }
+
+            if (Mathf.Abs(entryKickDirection) > 0.05f)
+            {
+                return Mathf.Sign(entryKickDirection);
+            }
+
+            return 1f;
         }
 
         public void ApplyArcadeAssist(VehicleTuning tuning, Rigidbody body, VehicleInputState input, float deltaTime)
@@ -138,15 +212,18 @@ namespace GTX.Vehicle
             }
 
             float speed = body.velocity.magnitude;
-            float steerDirection = Mathf.Abs(input.steer) > 0.04f ? Mathf.Sign(input.steer) : entryKickDirection;
+            float steerDirection = Mathf.Abs(driftDirection) > 0.05f ? Mathf.Sign(driftDirection) : entryKickDirection;
             float entry01 = EntryAmount;
-            float yawInput = input.steer * tuning.driftYawAssist * DriftAmount;
+            float driftSign = ResolveDriftDirection();
+            float turnIn = Mathf.Clamp01(driftSign * input.steer);
+            float counterSteer = Mathf.Clamp01(-driftSign * input.steer);
+            TurnInAmount = turnIn;
+            CounterSteerAmount = counterSteer;
+            float yawInput = input.steer * tuning.driftYawAssist * DriftAmount * (1f + turnIn * tuning.driftTightenYawAssist);
             yawInput += entryKickDirection * tuning.driftEntryYawKick * tuning.driftHandbrakeEntryKick * entry01 * Mathf.InverseLerp(tuning.driftMinSpeed, tuning.driftMinSpeed + 12f, speed);
             body.AddRelativeTorque(Vector3.up * yawInput, ForceMode.Acceleration);
 
             Vector3 localVelocity = body.transform.InverseTransformDirection(body.velocity);
-            float slipSign = Mathf.Abs(SlipAngle) > 1.2f ? Mathf.Sign(SlipAngle) : 0f;
-            CounterSteerAmount = Mathf.Clamp01(-slipSign * input.steer);
             float exitAssist01 = Mathf.Clamp01(Mathf.InverseLerp(0f, Mathf.Max(0.01f, tuning.driftExitHoldSeconds), exitAssistTimer));
             float lowDriftExit01 = Mathf.InverseLerp(0.72f, 0.06f, DriftAmount);
             float exitControl01 = Mathf.Clamp01(Mathf.Max(CounterSteerAmount * lowDriftExit01, exitAssist01 * lowDriftExit01));
@@ -165,7 +242,7 @@ namespace GTX.Vehicle
 
             if (input.throttle > 0.1f)
             {
-                float forwardAssist = tuning.driftForwardAssist * input.throttle * DriftAmount * Mathf.Lerp(1f, 0.62f, exitControl01);
+                float forwardAssist = tuning.driftForwardAssist * input.throttle * Mathf.Max(DriftAmount, ExitBoostTimer > 0f ? 0.42f : 0f) * Mathf.Lerp(1f, 0.62f, exitControl01);
                 body.AddForce(body.transform.forward * forwardAssist, ForceMode.Acceleration);
             }
         }

@@ -5,6 +5,7 @@ using GTX.Core;
 using GTX.Data;
 using GTX.Flow;
 using GTX.Vehicle;
+using GTX.Visuals;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -390,28 +391,28 @@ namespace GTX.UI
             ConfigureCanvasScaler(canvas);
 
             RectTransform root = canvas.GetComponent<RectTransform>();
-            hudPanel = Panel("HUD", root, Anchor.BottomLeft, new Vector2(36f, 36f), new Vector2(356f, 188f), new Color(0.015f, 0.02f, 0.045f, 0.82f));
+            hudPanel = Panel("HUD", root, Anchor.BottomLeft, new Vector2(36f, 36f), new Vector2(356f, 188f), VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.88f));
             speedText = Label("Speed", hudPanel.transform, "000", 66, TextAnchor.MiddleLeft, new Vector2(20f, 98f), new Vector2(170f, 72f));
             Label("SpeedUnit", hudPanel.transform, "MPH", 15, TextAnchor.MiddleLeft, new Vector2(194f, 132f), new Vector2(72f, 22f));
             gearText = Label("Gear", hudPanel.transform, "G1", 38, TextAnchor.MiddleCenter, new Vector2(270f, 102f), new Vector2(62f, 56f));
             rpmText = Label("RPM", hudPanel.transform, "900 RPM", 16, TextAnchor.MiddleLeft, new Vector2(20f, 72f), new Vector2(132f, 22f));
-            rpmSlider = Meter("RPM Meter", hudPanel.transform, new Vector2(154f, 78f), new Vector2(178f, 10f), new Color(1f, 0.48f, 0.08f, 1f));
+            rpmSlider = Meter("RPM Meter", hudPanel.transform, new Vector2(154f, 78f), new Vector2(178f, 10f), VectrStyleTokens.SafetyOrange);
             boostText = Label("Boost", hudPanel.transform, "BOOST 0%", 14, TextAnchor.MiddleLeft, new Vector2(20f, 44f), new Vector2(94f, 20f));
-            boostSlider = Meter("Boost Meter", hudPanel.transform, new Vector2(116f, 50f), new Vector2(216f, 8f), new Color(0.36f, 0.67f, 1f, 1f));
+            boostSlider = Meter("Boost Meter", hudPanel.transform, new Vector2(116f, 50f), new Vector2(216f, 8f), VectrStyleTokens.ElectricCyan);
             heatText = Label("Heat", hudPanel.transform, "HEAT 0%", 14, TextAnchor.MiddleLeft, new Vector2(20f, 20f), new Vector2(94f, 20f));
-            heatSlider = Meter("Heat Meter", hudPanel.transform, new Vector2(116f, 26f), new Vector2(216f, 8f), new Color(1f, 0.48f, 0.08f, 1f));
+            heatSlider = Meter("Heat Meter", hudPanel.transform, new Vector2(116f, 26f), new Vector2(216f, 8f), VectrStyleTokens.SignalRed);
 
             feedbackText = Label("Feedback", root, "Ready", 28, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(280f, 46f));
             SetAnchor(feedbackText.rectTransform, Anchor.TopCenter, new Vector2(0f, -76f), new Vector2(280f, 46f));
 
-            controlsPanel = Panel("Controls Overlay", root, Anchor.TopLeft, new Vector2(24f, -24f), new Vector2(330f, 104f), new Color(0.015f, 0.02f, 0.045f, 0.68f));
+            controlsPanel = Panel("Controls Overlay", root, Anchor.TopLeft, new Vector2(24f, -24f), new Vector2(330f, 104f), VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.72f));
             Label("Controls Title", controlsPanel.transform, "CONTROLS", 12, TextAnchor.MiddleLeft, new Vector2(12f, 78f), new Vector2(86f, 18f));
             controlsText = Label("Controls Text", controlsPanel.transform, string.Empty, 9, TextAnchor.MiddleLeft, new Vector2(12f, 3f), new Vector2(306f, 76f));
             RefreshControlsText();
 
-            flowPanel = Panel("Debug Flow", root, Anchor.TopRight, new Vector2(-32f, -32f), new Vector2(224f, 72f), new Color(0.015f, 0.02f, 0.045f, 0.78f));
+            flowPanel = Panel("Debug Flow", root, Anchor.TopRight, new Vector2(-32f, -32f), new Vector2(224f, 72f), VectrStyleTokens.WithAlpha(VectrStyleTokens.DeepViolet, 0.78f));
             flowText = Label("Flow Text", flowPanel.transform, "FLOW 0%", 15, TextAnchor.MiddleLeft, new Vector2(16f, 38f), new Vector2(92f, 20f));
-            flowSlider = Meter("Flow Meter", flowPanel.transform, new Vector2(16f, 24f), new Vector2(192f, 8f), new Color(1f, 0.48f, 0.08f, 1f));
+            flowSlider = Meter("Flow Meter", flowPanel.transform, new Vector2(16f, 24f), new Vector2(192f, 8f), VectrStyleTokens.HotMagenta);
             flowPanel.SetActive(false);
 
             BuildGarage(root);
@@ -454,8 +455,8 @@ namespace GTX.UI
 
         private void BuildGarage(RectTransform root)
         {
-            garagePanel = Panel("Garage Tuning", root, Anchor.MiddleRight, new Vector2(-34f, 0f), new Vector2(324f, 438f), new Color(0.015f, 0.02f, 0.045f, 0.94f));
-            Label("Garage Title", garagePanel.transform, "GARAGE", 24, TextAnchor.MiddleLeft, new Vector2(18f, 392f), new Vector2(130f, 30f));
+            garagePanel = Panel("Garage Tuning", root, Anchor.MiddleRight, new Vector2(-34f, 0f), new Vector2(324f, 438f), VectrStyleTokens.WithAlpha(VectrStyleTokens.OilGray, 0.96f));
+            Label("Garage Title", garagePanel.transform, "DASH BAY", 24, TextAnchor.MiddleLeft, new Vector2(18f, 392f), new Vector2(150f, 30f));
 
             AddPresetButton("Strike", GTXTuningPreset.Strike, new Vector2(18f, 348f));
             AddPresetButton("Drift", GTXTuningPreset.Drift, new Vector2(118f, 348f));
@@ -686,7 +687,7 @@ namespace GTX.UI
             label.text = text;
             label.fontSize = size;
             label.alignment = anchor;
-            label.color = new Color(0.96f, 0.92f, 0.82f, 1f);
+            label.color = VectrStyleTokens.BoneWhite;
             RectTransform rect = label.rectTransform;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.zero;
@@ -716,11 +717,11 @@ namespace GTX.UI
 
         private Button Button(string label, Transform parent, Vector2 position, Vector2 dimensions)
         {
-            GameObject gameObject = Panel(label + " Button", parent, Anchor.BottomLeft, position, dimensions, new Color(0.08f, 0.13f, 0.23f, 0.96f));
+            GameObject gameObject = Panel(label + " Button", parent, Anchor.BottomLeft, position, dimensions, VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.96f));
             Button button = gameObject.AddComponent<Button>();
             ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(0.2f, 0.32f, 0.34f, 1f);
-            colors.pressedColor = new Color(0.08f, 0.22f, 0.24f, 1f);
+            colors.highlightedColor = VectrStyleTokens.WithAlpha(VectrStyleTokens.ElectricCyan, 0.88f);
+            colors.pressedColor = VectrStyleTokens.WithAlpha(VectrStyleTokens.DeepViolet, 0.9f);
             button.colors = colors;
             Label(label + " Text", gameObject.transform, label, 14, TextAnchor.MiddleCenter, Vector2.zero, dimensions);
             return button;
@@ -738,7 +739,7 @@ namespace GTX.UI
             rect.sizeDelta = dimensions;
 
             Image background = root.AddComponent<Image>();
-            background.color = new Color(1f, 1f, 1f, 0.16f);
+            background.color = VectrStyleTokens.WithAlpha(VectrStyleTokens.InkBlack, 0.72f);
 
             GameObject fill = new GameObject("Fill");
             fill.transform.SetParent(root.transform, false);
@@ -768,7 +769,50 @@ namespace GTX.UI
             image.color = color;
             RectTransform rect = gameObject.GetComponent<RectTransform>();
             SetAnchor(rect, anchor, position, dimensions);
+            AddHardwareFrame(rect);
             return gameObject;
+        }
+
+        private static void AddHardwareFrame(RectTransform panel)
+        {
+            CreatePanelStripe(panel, "Top Ink Frame", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, -4f), Vector2.zero, VectrStyleTokens.InkBlack);
+            CreatePanelStripe(panel, "Bottom Ink Frame", Vector2.zero, new Vector2(1f, 0f), Vector2.zero, Vector2.zero, new Vector2(0f, 4f), VectrStyleTokens.InkBlack);
+            CreatePanelStripe(panel, "Left Ink Frame", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Vector2(4f, 0f), VectrStyleTokens.InkBlack);
+            CreatePanelStripe(panel, "Right Ink Frame", new Vector2(1f, 0f), Vector2.one, new Vector2(1f, 0f), new Vector2(-4f, 0f), Vector2.zero, VectrStyleTokens.InkBlack);
+            CreatePanelScrew(panel, "Screw NW", new Vector2(8f, -8f));
+            CreatePanelScrew(panel, "Screw NE", new Vector2(-16f, -8f), true);
+            CreatePanelScrew(panel, "Screw SW", new Vector2(8f, 16f), false, true);
+            CreatePanelScrew(panel, "Screw SE", new Vector2(-16f, 16f), true, true);
+        }
+
+        private static void CreatePanelStripe(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 offsetMin, Vector2 offsetMax, Color color)
+        {
+            GameObject stripeObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            stripeObject.transform.SetParent(parent, false);
+            RectTransform stripe = stripeObject.GetComponent<RectTransform>();
+            stripe.anchorMin = anchorMin;
+            stripe.anchorMax = anchorMax;
+            stripe.pivot = pivot;
+            stripe.offsetMin = offsetMin;
+            stripe.offsetMax = offsetMax;
+            Image image = stripeObject.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        private static void CreatePanelScrew(RectTransform parent, string name, Vector2 anchoredPosition, bool right = false, bool bottom = false)
+        {
+            GameObject screwObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            screwObject.transform.SetParent(parent, false);
+            RectTransform screw = screwObject.GetComponent<RectTransform>();
+            screw.anchorMin = new Vector2(right ? 1f : 0f, bottom ? 0f : 1f);
+            screw.anchorMax = screw.anchorMin;
+            screw.pivot = new Vector2(0f, 1f);
+            screw.anchoredPosition = anchoredPosition;
+            screw.sizeDelta = new Vector2(8f, 8f);
+            Image image = screwObject.GetComponent<Image>();
+            image.color = VectrStyleTokens.WarmConcreteGray;
+            image.raycastTarget = false;
         }
 
         private static void SetAnchor(RectTransform rect, Anchor anchor, Vector2 position, Vector2 dimensions)
