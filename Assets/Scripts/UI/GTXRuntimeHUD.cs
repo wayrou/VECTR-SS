@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using GTX.Core;
 using GTX.Data;
 using GTX.Flow;
 using GTX.Vehicle;
@@ -21,7 +22,6 @@ namespace GTX.UI
         [SerializeField] private GTXTuningProfile tuning = GTXTuningProfile.FromPreset(GTXTuningPreset.Strike);
 
         [Header("Input")]
-        [SerializeField] private KeyCode garageToggleKey = KeyCode.Tab;
         [SerializeField] private KeyCode controlsToggleKey = KeyCode.F1;
         [SerializeField] private KeyCode flowToggleKey = KeyCode.F3;
 
@@ -228,12 +228,12 @@ namespace GTX.UI
 
         private void Update()
         {
-            if (Input.GetKeyDown(garageToggleKey))
+            if (Input.GetKeyDown(KeyCode.Tab))
             {
                 ToggleGarage();
             }
 
-            if (Input.GetKeyDown(controlsToggleKey))
+            if (Input.GetKeyDown(controlsToggleKey) || GTXInput.ButtonDown(10))
             {
                 ToggleControls();
             }
@@ -425,11 +425,11 @@ namespace GTX.UI
             }
 
             string text =
-                "W/S throttle/brake   A/D steer\n" +
+                "W/S or R2/L2 throttle/brake   A/D steer\n" +
                 "Arrows camera   Q/E gears\n" +
                 "Hold Q reverse   Shift clutch   Space drift\n" +
-                "F boost   Z/C slam   N guard   R reset\n" +
-                "Tab garage   ` QUAC   F3 flow   F1 hide";
+                "F / Circle boost   X drift   Z/C slam   N guard   R reset\n" +
+                "Tab garage   F4 pixels   F5 camera   ` QUAC   F3 flow   F1 hide";
 
             if (moduleControlHints.Count > 0)
             {

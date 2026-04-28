@@ -99,6 +99,11 @@ namespace GTX.Vehicle
 
         public bool RequestShift(VehicleTuning tuning, int targetGear, float engineRpm)
         {
+            return RequestShift(tuning, targetGear, engineRpm, true);
+        }
+
+        public bool RequestShift(VehicleTuning tuning, int targetGear, float engineRpm, bool judgeShift)
+        {
             if (tuning == null || IsShifting || shiftCooldownTimer > 0f)
             {
                 return false;
@@ -116,8 +121,28 @@ namespace GTX.Vehicle
             shiftCooldownTimer = tuning.shiftCooldown + shiftDuration;
             IsShifting = true;
             LastShiftAge = 0f;
-            LastShiftQuality = JudgeShift(tuning, engineRpm);
+            LastShiftQuality = judgeShift ? JudgeShift(tuning, engineRpm) : ShiftQuality.None;
             currentRatio = 0f;
+            return true;
+        }
+
+        public bool ForceShiftImmediate(VehicleTuning tuning, int targetGear)
+        {
+            if (tuning == null)
+            {
+                return false;
+            }
+
+            targetGear = Mathf.Clamp(targetGear, ReverseGear, MaxForwardGear);
+            CurrentGear = targetGear;
+            currentRatio = GetRatioForGear(tuning, CurrentGear);
+            IsShifting = false;
+            LastShiftAge = 99f;
+            LastShiftQuality = ShiftQuality.None;
+            ReverseHoldProgress = 0f;
+            shiftTimer = 0f;
+            shiftCooldownTimer = 0f;
+            reverseHoldTimer = 0f;
             return true;
         }
 

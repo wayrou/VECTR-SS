@@ -25,6 +25,7 @@ namespace GTX.Core
         private Material outlineMaterial;
         private Material inkMaterial;
         private Material boostTrailMaterial;
+        private Material launchSmokeMaterial;
         private Material trackMarkerMaterial;
         private Material trackMarkerBlueMaterial;
         private Material desertMaterial;
@@ -57,11 +58,29 @@ namespace GTX.Core
         private GUIStyle titleStyle;
         private GUIStyle headerStyle;
         private GUIStyle bodyStyle;
+        private GUIStyle smallStyle;
+        private GUIStyle focusStyle;
         private GUIStyle panelStyle;
         private GUIStyle buttonStyle;
+        private GUIStyle cardStyle;
         private GUIStyle scrollStyle;
         private Texture2D panelTexture;
+        private Texture2D cardTexture;
+        private Texture2D focusTexture;
         private bool startRaceQueued;
+        private bool restartRaceQueued;
+        private bool racePaused;
+        private float timeScaleBeforePause = 1f;
+        private int menuFocusIndex;
+        private int lastPreviewMapIndex = -1;
+        private int lastPreviewVehicleIndex = -1;
+        private Transform previewRoot;
+        private Camera mapPreviewCamera;
+        private Camera vehiclePreviewCamera;
+        private RenderTexture mapPreviewTexture;
+        private RenderTexture vehiclePreviewTexture;
+        private Transform vehiclePreviewSpinRoot;
+        private readonly List<Transform> mapPreviewSpinRoots = new List<Transform>();
         private static readonly float[] CheckpointFractions = { 0.25f, 0.5f, 0.75f };
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -82,16 +101,32 @@ namespace GTX.Core
             BuildLighting();
             EnsureEventSystem();
             EnsureProgressionState();
+            EnsureMenuPreviews();
             screen = VectorSSScreen.MainMenu;
             SetRaceHudVisible(false);
+        }
+
+        private void OnDestroy()
+        {
+            if (racePaused || Mathf.Approximately(Time.timeScale, 0f))
+            {
+                Time.timeScale = Mathf.Approximately(timeScaleBeforePause, 0f) ? 1f : timeScaleBeforePause;
+            }
         }
 
         private void Update()
         {
             ProcessQueuedGuiActions();
+            HandleControllerMenuInput();
+            UpdateMenuPreviews();
 
             if (screen == VectorSSScreen.Racing && hasActivePlayer)
             {
+                if (activePlayer.vehicle != null && playerProfile != null)
+                {
+                    activePlayer.vehicle.AutomaticTransmission = playerProfile.tuning.automaticTransmission;
+                }
+
                 UpdateRaceCompletion();
                 UpdateRazorNearMissFlow();
                 UpdateModuleHud();
@@ -109,15 +144,11 @@ namespace GTX.Core
                 return;
             }
 
-            Rect panel = new Rect(36f, 36f, 520f, Screen.height - 72f);
-            GUILayout.BeginArea(panel, panelStyle);
-            menuScroll = GUILayout.BeginScrollView(menuScroll, scrollStyle);
-            GUILayout.Label("VECTOR SS", titleStyle);
-            GUILayout.Label("0.1.0 Blackline Prototype", bodyStyle);
-            GUILayout.Space(12f);
-
             switch (screen)
             {
+                case VectorSSScreen.Paused:
+                    DrawPauseMenu();
+                    break;
                 case VectorSSScreen.MapSelect:
                     DrawMapSelect();
                     break;
@@ -134,9 +165,6 @@ namespace GTX.Core
                     DrawMainMenu();
                     break;
             }
-
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
         }
 
         private void BuildMaterials()
@@ -153,6 +181,7 @@ namespace GTX.Core
             outlineMaterial = CreateOutlineMaterial("GTX Inverted Hull Ink", new Color(0.006f, 0.009f, 0.02f, 1f));
             inkMaterial = CreateMaterial("GTX Solid Ink Navy", new Color(0.006f, 0.009f, 0.02f, 1f), false);
             boostTrailMaterial = CreateMaterial("GTX Cyan Boost Print", new Color(0.08f, 0.78f, 1f, 0.92f), false);
+            launchSmokeMaterial = CreateParticleMaterial("GTX Launch Dust Smoke", new Color(0.56f, 0.52f, 0.43f, 0.46f));
             trackMarkerMaterial = CreateMaterial("GTX Track Marker Orange", new Color(1f, 0.44f, 0.08f, 1f), true);
             trackMarkerBlueMaterial = CreateMaterial("GTX Track Marker Blue", new Color(0.05f, 0.42f, 0.96f, 1f), true);
             desertMaterial = CreateMaterial("GTX Desert Board Sand", new Color(0.80f, 0.65f, 0.42f, 1f), true);
@@ -210,102 +239,185 @@ namespace GTX.Core
 
         private void DrawMainMenu()
         {
-            GUILayout.Label("Complete loop: map select -> vehicle select -> race -> resources -> garage -> race again.", bodyStyle);
-            GUILayout.Space(8f);
-            GUILayout.Label("Selected Map", headerStyle);
-            GUILayout.Label(selectedMap.displayName + " - " + selectedMap.purpose, bodyStyle);
-            GUILayout.Label("Selected Vehicle", headerStyle);
-            GUILayout.Label(selectedVehicle.fullName + " - " + selectedVehicle.role, bodyStyle);
-            GUILayout.Space(12f);
-            if (GUILayout.Button("Start Game", buttonStyle, GUILayout.Height(42f)))
+            DrawMenuBackdrop();
+            Rect hero = new Rect(64f, 54f, Screen.width - 128f, Screen.height - 108f);
+            GUI.Box(hero, string.Empty, panelStyle);
+            GUI.Label(new Rect(hero.x + 34f, hero.y + 28f, 520f, 72f), "VECTOR SS", titleStyle);
+            GUI.Label(new Rect(hero.x + 38f, hero.y + 102f, 560f, 28f), "BLACKLINE PROTOTYPE / GARAGE LOOP", bodyStyle);
+
+            Rect mapPreview = new Rect(hero.x + hero.width - 468f, hero.y + 56f, 398f, 228f);
+            DrawRenderPreview(mapPreview, mapPreviewTexture);
+            GUI.Label(new Rect(mapPreview.x, mapPreview.yMax + 10f, mapPreview.width, 28f), selectedMap.displayName.ToUpperInvariant(), headerStyle);
+            GUI.Label(new Rect(mapPreview.x, mapPreview.yMax + 42f, mapPreview.width, 52f), selectedMap.theme, bodyStyle);
+
+            Rect vehiclePreview = new Rect(hero.x + hero.width - 468f, hero.y + 372f, 398f, 228f);
+            DrawRenderPreview(vehiclePreview, vehiclePreviewTexture);
+            GUI.Label(new Rect(vehiclePreview.x, vehiclePreview.yMax + 10f, vehiclePreview.width, 28f), selectedVehicle.fullName.ToUpperInvariant(), headerStyle);
+            GUI.Label(new Rect(vehiclePreview.x, vehiclePreview.yMax + 42f, vehiclePreview.width, 44f), selectedVehicle.role, bodyStyle);
+
+            Rect buttonColumn = new Rect(hero.x + 38f, hero.y + 198f, 430f, 292f);
+            if (DrawFocusedButton(new Rect(buttonColumn.x, buttonColumn.y, buttonColumn.width, 62f), "START GAME", 0))
             {
                 screen = VectorSSScreen.MapSelect;
+                menuFocusIndex = 0;
             }
 
-            if (GUILayout.Button("Garage", buttonStyle, GUILayout.Height(38f)))
+            if (DrawFocusedButton(new Rect(buttonColumn.x, buttonColumn.y + 78f, buttonColumn.width, 56f), "GARAGE", 1))
             {
                 screen = VectorSSScreen.Garage;
+                menuFocusIndex = 0;
             }
 
-            if (GUILayout.Button("Quick Race With Current Setup", buttonStyle, GUILayout.Height(38f)))
+            if (DrawFocusedButton(new Rect(buttonColumn.x, buttonColumn.y + 148f, buttonColumn.width, 56f), "QUICK RACE", 2))
             {
                 startRaceQueued = true;
             }
 
-            GUILayout.Space(12f);
-            GUILayout.Label(playerProfile.resources.ToString(), headerStyle);
+            GUI.Label(new Rect(buttonColumn.x, buttonColumn.y + 232f, buttonColumn.width, 54f), playerProfile.resources.ToString(), headerStyle);
+            GUI.Label(new Rect(hero.x + 38f, hero.yMax - 46f, hero.width - 76f, 26f), "D-PAD / LEFT STICK NAVIGATE    CIRCLE CONFIRM    X BACK", smallStyle);
         }
 
         private void DrawMapSelect()
         {
-            GUILayout.Label("Choose Map", headerStyle);
-            for (int i = 0; i < VectorSSCatalog.Maps.Length; i++)
-            {
-                VectorSSMapDefinition map = VectorSSCatalog.Maps[i];
-                GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(map.displayName, headerStyle);
-                GUILayout.Label(map.theme, bodyStyle);
-                GUILayout.Label("Laps: " + map.lapCount + "   Reward bias: +" + map.mapBonus, bodyStyle);
-                if (GUILayout.Button(playerProfile.selectedMap == map.id ? "Selected" : "Select " + map.displayName, buttonStyle, GUILayout.Height(34f)))
-                {
-                    playerProfile.selectedMap = map.id;
-                    selectedMap = map;
-                    VectorSSSaveSystem.Save(playerProfile);
-                }
+            DrawMenuBackdrop();
+            DrawCarouselHeader("STAGE SELECT", "LEFT / RIGHT TO SCROLL STAGES");
+            int selectedIndex = IndexOfMap(selectedMap);
+            DrawStageCarousel(selectedIndex);
 
-                GUILayout.EndVertical();
-                GUILayout.Space(8f);
-            }
+            Rect preview = new Rect(Screen.width * 0.5f - 300f, 164f, 600f, 338f);
+            DrawRenderPreview(preview, mapPreviewTexture);
+            VectorSSMapDefinition map = selectedMap;
+            GUI.Label(new Rect(82f, 534f, Screen.width - 164f, 42f), map.displayName.ToUpperInvariant(), titleStyle);
+            GUI.Label(new Rect(84f, 584f, Screen.width - 168f, 30f), map.purpose + " / " + map.lapCount + " LAP", headerStyle);
+            GUI.Label(new Rect(84f, 622f, Screen.width - 168f, 48f), map.theme, bodyStyle);
+            GUI.Label(new Rect(84f, 674f, Screen.width - 168f, 30f), "BASE " + map.baseReward + "     BONUS " + map.mapBonus, smallStyle);
 
-            if (GUILayout.Button("Continue To Vehicle Select", buttonStyle, GUILayout.Height(40f)))
+            if (DrawFocusedButton(new Rect(Screen.width - 300f, Screen.height - 94f, 220f, 52f), "NEXT", 0))
             {
                 screen = VectorSSScreen.VehicleSelect;
+                menuFocusIndex = 0;
             }
-
-            if (GUILayout.Button("Back", buttonStyle, GUILayout.Height(32f)))
+            if (DrawFocusedButton(new Rect(80f, Screen.height - 94f, 180f, 52f), "BACK", 1))
             {
                 screen = VectorSSScreen.MainMenu;
+                menuFocusIndex = 0;
             }
         }
 
         private void DrawVehicleSelect()
         {
-            GUILayout.Label("Choose Vehicle", headerStyle);
-            for (int i = 0; i < VectorSSCatalog.Vehicles.Length; i++)
-            {
-                VectorSSVehicleDefinition vehicle = VectorSSCatalog.Vehicles[i];
-                GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(vehicle.fullName, headerStyle);
-                GUILayout.Label(vehicle.vehicleClass + " - " + vehicle.role, bodyStyle);
-                GUILayout.Label(vehicle.StatsLine, bodyStyle);
-                GUILayout.Label("Primary resource: " + vehicle.primaryResource, bodyStyle);
-                if (GUILayout.Button(playerProfile.selectedVehicle == vehicle.id ? "Selected" : "Select " + vehicle.displayName, buttonStyle, GUILayout.Height(34f)))
-                {
-                    playerProfile.selectedVehicle = vehicle.id;
-                    selectedVehicle = vehicle;
-                    VectorSSSaveSystem.Save(playerProfile);
-                }
+            DrawMenuBackdrop();
+            DrawCarouselHeader("VEHICLE SELECT", "LEFT / RIGHT TO SCROLL MACHINES");
+            int selectedIndex = IndexOfVehicle(selectedVehicle);
+            DrawVehicleCarousel(selectedIndex);
 
-                GUILayout.EndVertical();
-                GUILayout.Space(8f);
-            }
+            Rect preview = new Rect(Screen.width * 0.5f - 300f, 152f, 600f, 350f);
+            DrawRenderPreview(preview, vehiclePreviewTexture);
+            VectorSSVehicleDefinition vehicle = selectedVehicle;
+            GUI.Label(new Rect(82f, 530f, Screen.width - 164f, 42f), vehicle.fullName.ToUpperInvariant(), titleStyle);
+            GUI.Label(new Rect(84f, 580f, Screen.width - 168f, 30f), vehicle.vehicleClass + " / " + vehicle.primaryResource, headerStyle);
+            GUI.Label(new Rect(84f, 616f, Screen.width - 168f, 48f), vehicle.role, bodyStyle);
+            GUI.Label(new Rect(84f, 668f, Screen.width - 168f, 30f), vehicle.StatsLine, smallStyle);
 
-            if (GUILayout.Button("Race " + selectedMap.displayName, buttonStyle, GUILayout.Height(42f)))
+            if (DrawFocusedButton(new Rect(Screen.width - 300f, Screen.height - 94f, 220f, 52f), "RACE", 0))
             {
                 startRaceQueued = true;
             }
-
-            if (GUILayout.Button("Back To Map Select", buttonStyle, GUILayout.Height(32f)))
+            if (DrawFocusedButton(new Rect(80f, Screen.height - 94f, 180f, 52f), "BACK", 1))
             {
                 screen = VectorSSScreen.MapSelect;
+                menuFocusIndex = 0;
+            }
+        }
+
+        private void DrawMenuBackdrop()
+        {
+            GUI.color = new Color(0.025f, 0.032f, 0.045f, 1f);
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            for (int i = 0; i < 10; i++)
+            {
+                float y = 28f + i * 74f + Mathf.Sin(Time.time * 0.7f + i) * 8f;
+                GUI.color = i % 2 == 0 ? new Color(0.05f, 0.22f, 0.34f, 0.28f) : new Color(0.95f, 0.26f, 0.05f, 0.2f);
+                GUI.DrawTexture(new Rect(-40f, y, Screen.width + 80f, 3f), Texture2D.whiteTexture);
+            }
+
+            GUI.color = Color.white;
+        }
+
+        private void DrawCarouselHeader(string title, string hint)
+        {
+            GUI.Box(new Rect(52f, 38f, Screen.width - 104f, 92f), string.Empty, panelStyle);
+            GUI.Label(new Rect(82f, 50f, 540f, 54f), title, titleStyle);
+            GUI.Label(new Rect(86f, 100f, 520f, 22f), hint + "    CIRCLE CONFIRM    X BACK", smallStyle);
+        }
+
+        private void DrawStageCarousel(int selectedIndex)
+        {
+            float cardWidth = 228f;
+            float centerX = Screen.width * 0.5f;
+            float y = Screen.height - 156f;
+            for (int i = 0; i < VectorSSCatalog.Maps.Length; i++)
+            {
+                int offset = i - selectedIndex;
+                Rect rect = new Rect(centerX - cardWidth * 0.5f + offset * 252f, y, cardWidth, 92f);
+                DrawCarouselCard(rect, VectorSSCatalog.Maps[i].displayName, VectorSSCatalog.Maps[i].purpose, i == selectedIndex);
+            }
+        }
+
+        private void DrawVehicleCarousel(int selectedIndex)
+        {
+            float cardWidth = 218f;
+            float centerX = Screen.width * 0.5f;
+            float y = Screen.height - 156f;
+            for (int i = 0; i < VectorSSCatalog.Vehicles.Length; i++)
+            {
+                int offset = i - selectedIndex;
+                Rect rect = new Rect(centerX - cardWidth * 0.5f + offset * 238f, y, cardWidth, 92f);
+                VectorSSVehicleDefinition vehicle = VectorSSCatalog.Vehicles[i];
+                DrawCarouselCard(rect, vehicle.displayName, vehicle.vehicleClass + " / " + vehicle.primaryResource, i == selectedIndex);
+            }
+        }
+
+        private void DrawCarouselCard(Rect rect, string title, string subtitle, bool selected)
+        {
+            GUI.Box(rect, string.Empty, selected ? focusStyle : cardStyle);
+            GUI.Label(new Rect(rect.x + 14f, rect.y + 12f, rect.width - 28f, 28f), title.ToUpperInvariant(), headerStyle);
+            GUI.Label(new Rect(rect.x + 14f, rect.y + 48f, rect.width - 28f, 34f), subtitle, smallStyle);
+        }
+
+        private bool DrawFocusedButton(Rect rect, string label, int focusIndex)
+        {
+            bool focused = menuFocusIndex == focusIndex;
+            GUIStyle style = focused ? focusStyle : buttonStyle;
+            bool pressed = GUI.Button(rect, label, style);
+            if (pressed)
+            {
+                menuFocusIndex = focusIndex;
+            }
+
+            return pressed;
+        }
+
+        private void DrawRenderPreview(Rect rect, RenderTexture texture)
+        {
+            GUI.Box(rect, string.Empty, cardStyle);
+            if (texture != null)
+            {
+                GUI.DrawTexture(new Rect(rect.x + 6f, rect.y + 6f, rect.width - 12f, rect.height - 12f), texture, ScaleMode.ScaleToFit, false);
             }
         }
 
         private void DrawGarage()
         {
+            DrawMenuBackdrop();
+            GUILayout.BeginArea(new Rect(44f, 40f, Mathf.Min(760f, Screen.width - 88f), Screen.height - 80f), panelStyle);
+            menuScroll = GUILayout.BeginScrollView(menuScroll, scrollStyle);
             GUILayout.Label("Garage", headerStyle);
             GUILayout.Label(playerProfile.resources.ToString(), headerStyle);
             GUILayout.Label("Current vehicle: " + selectedVehicle.fullName, bodyStyle);
+            GUILayout.Label("Controller focus: " + GarageFocusLabel(menuFocusIndex) + "    D-pad up/down select    left/right adjust    Circle activate    X back", smallStyle);
             GUILayout.Space(8f);
 
             garageScroll = GUILayout.BeginScrollView(garageScroll, scrollStyle, GUILayout.Height(Mathf.Min(520f, Screen.height - 250f)));
@@ -317,6 +429,7 @@ namespace GTX.Core
             DrawTuningSlider("Suspension", ref playerProfile.tuning.suspension, 0.55f, 1.65f);
             DrawTuningSlider("Tire Grip", ref playerProfile.tuning.tireGrip, 0.55f, 1.85f);
             DrawTuningSlider("Clutch Bite", ref playerProfile.tuning.clutchBite, 0.55f, 1.8f);
+            DrawTransmissionToggle();
             DrawTuningSlider("Outline Thickness", ref playerProfile.tuning.outlineThickness, 0.65f, 1.6f);
             DrawTuningSlider("Camera Shake", ref playerProfile.tuning.cameraShake, 0f, 1f);
             if (selectedVehicle.isBike)
@@ -365,31 +478,37 @@ namespace GTX.Core
                 VectorSSSaveSystem.Save(playerProfile);
                 screen = VectorSSScreen.MainMenu;
             }
+
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
         }
 
         private void DrawResults()
         {
-            GUILayout.Label("Race Complete", headerStyle);
+            DrawMenuBackdrop();
+            Rect panel = new Rect(Screen.width * 0.5f - 310f, 92f, 620f, 500f);
+            GUI.Box(panel, string.Empty, panelStyle);
+            GUI.Label(new Rect(panel.x + 34f, panel.y + 30f, panel.width - 68f, 58f), "RACE COMPLETE", titleStyle);
             if (lastResult != null)
             {
-                GUILayout.Label(lastResult.vehicle.displayName + " on " + lastResult.map.displayName, bodyStyle);
-                GUILayout.Label("Time: " + lastResult.raceTime.ToString("0.0") + "s   Flow Style: " + Mathf.RoundToInt(lastResult.flow01 * 100f) + "%", bodyStyle);
-                GUILayout.Label("Completion: " + lastResult.completionReward, bodyStyle);
-                GUILayout.Label("Style/Combat: " + lastResult.styleReward, bodyStyle);
-                GUILayout.Label("Map Bonus: " + lastResult.mapReward, bodyStyle);
-                GUILayout.Label("Earned: " + lastResult.Total, headerStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 106f, panel.width - 76f, 28f), lastResult.vehicle.displayName + " / " + lastResult.map.displayName, headerStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 150f, panel.width - 76f, 28f), "TIME " + lastResult.raceTime.ToString("0.0") + "s     FLOW " + Mathf.RoundToInt(lastResult.flow01 * 100f) + "%", bodyStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 190f, panel.width - 76f, 28f), "COMPLETION  " + lastResult.completionReward, bodyStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 226f, panel.width - 76f, 28f), "STYLE / COMBAT  " + lastResult.styleReward, bodyStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 262f, panel.width - 76f, 28f), "MAP BONUS  " + lastResult.mapReward, bodyStyle);
+                GUI.Label(new Rect(panel.x + 38f, panel.y + 320f, panel.width - 76f, 34f), "EARNED  " + lastResult.Total, headerStyle);
             }
 
-            GUILayout.Space(8f);
-            GUILayout.Label("Totals: " + playerProfile.resources, headerStyle);
-            if (GUILayout.Button("Continue To Garage", buttonStyle, GUILayout.Height(42f)))
+            GUI.Label(new Rect(panel.x + 38f, panel.y + 374f, panel.width - 76f, 34f), "TOTALS  " + playerProfile.resources, smallStyle);
+            if (DrawFocusedButton(new Rect(panel.x + 38f, panel.y + 428f, 250f, 52f), "GARAGE", 0))
             {
                 screen = VectorSSScreen.Garage;
+                menuFocusIndex = 0;
             }
-
-            if (GUILayout.Button("Map Select", buttonStyle, GUILayout.Height(38f)))
+            if (DrawFocusedButton(new Rect(panel.x + panel.width - 288f, panel.y + 428f, 250f, 52f), "MAP SELECT", 1))
             {
                 screen = VectorSSScreen.MapSelect;
+                menuFocusIndex = 0;
             }
         }
 
@@ -409,6 +528,36 @@ namespace GTX.Core
             GUILayout.EndArea();
         }
 
+        private void DrawPauseMenu()
+        {
+            DrawRaceOverlay();
+            GUI.color = new Color(0.02f, 0.025f, 0.035f, 0.78f);
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            Rect panel = new Rect(Screen.width * 0.5f - 250f, Screen.height * 0.5f - 178f, 500f, 356f);
+            GUI.Box(panel, string.Empty, panelStyle);
+            GUI.Label(new Rect(panel.x + 34f, panel.y + 28f, panel.width - 68f, 56f), "PAUSED", titleStyle);
+            GUI.Label(new Rect(panel.x + 38f, panel.y + 88f, panel.width - 76f, 26f), selectedMap.displayName.ToUpperInvariant() + " / " + selectedVehicle.displayName.ToUpperInvariant(), smallStyle);
+
+            if (DrawFocusedButton(new Rect(panel.x + 54f, panel.y + 138f, panel.width - 108f, 54f), "RESUME", 0))
+            {
+                ResumeRace();
+            }
+
+            if (DrawFocusedButton(new Rect(panel.x + 54f, panel.y + 204f, panel.width - 108f, 54f), "RESTART RACE", 1))
+            {
+                RestartRace();
+            }
+
+            if (DrawFocusedButton(new Rect(panel.x + 54f, panel.y + 270f, panel.width - 108f, 54f), "LEAVE RACE", 2))
+            {
+                LeaveRace();
+            }
+
+            GUI.Label(new Rect(panel.x + 38f, panel.yMax + 14f, panel.width - 76f, 24f), "UP / DOWN SELECT    CIRCLE CONFIRM    X OR OPTIONS RESUME", smallStyle);
+        }
+
         private string CheckpointStatusText()
         {
             if (nextCheckpointIndex < CheckpointFractions.Length)
@@ -421,11 +570,368 @@ namespace GTX.Core
 
         private void ProcessQueuedGuiActions()
         {
+            if (restartRaceQueued)
+            {
+                restartRaceQueued = false;
+                ResumeRaceTime();
+                StartRace();
+                return;
+            }
+
             if (startRaceQueued)
             {
                 startRaceQueued = false;
+                ResumeRaceTime();
                 StartRace();
             }
+        }
+
+        private void HandleControllerMenuInput()
+        {
+            if (screen == VectorSSScreen.Racing)
+            {
+                if (PausePressed())
+                {
+                    PauseRace();
+                }
+
+                return;
+            }
+
+            EnsureProgressionState();
+            if (screen == VectorSSScreen.Paused)
+            {
+                HandlePauseMenuInput();
+                return;
+            }
+
+            if (GTXInput.ButtonDown(0))
+            {
+                ControllerBack();
+                return;
+            }
+
+            if (ControllerMenuLeft())
+            {
+                ControllerHorizontal(-1);
+            }
+            else if (ControllerMenuRight())
+            {
+                ControllerHorizontal(1);
+            }
+
+            if (ControllerMenuDown())
+            {
+                ControllerVertical(1);
+            }
+            else if (ControllerMenuUp())
+            {
+                ControllerVertical(-1);
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
+            {
+                ControllerVertical(1);
+            }
+            else if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
+            {
+                ControllerVertical(-1);
+            }
+
+            if (GTXInput.ButtonDown(1))
+            {
+                ControllerConfirm();
+            }
+            else if (GTXInput.ButtonDown(2))
+            {
+                startRaceQueued = screen == VectorSSScreen.MainMenu || screen == VectorSSScreen.VehicleSelect;
+            }
+            else if (GTXInput.ButtonDown(3))
+            {
+                if (screen == VectorSSScreen.MainMenu || screen == VectorSSScreen.Results)
+                {
+                    screen = VectorSSScreen.Garage;
+                }
+                else if (screen == VectorSSScreen.Garage)
+                {
+                    playerProfile.tuning.automaticTransmission = !playerProfile.tuning.automaticTransmission;
+                    VectorSSSaveSystem.Save(playerProfile);
+                    garageMessage = playerProfile.tuning.automaticTransmission ? "Automatic transmission enabled." : "Manual transmission enabled.";
+                }
+            }
+        }
+
+        private void ControllerVertical(int delta)
+        {
+            menuFocusIndex = WrapIndex(menuFocusIndex + delta, MenuFocusCount());
+        }
+
+        private void ControllerHorizontal(int delta)
+        {
+            if (screen == VectorSSScreen.MapSelect)
+            {
+                int index = IndexOfMap(selectedMap);
+                selectedMap = VectorSSCatalog.Maps[WrapIndex(index + delta, VectorSSCatalog.Maps.Length)];
+                playerProfile.selectedMap = selectedMap.id;
+                VectorSSSaveSystem.Save(playerProfile);
+            }
+            else if (screen == VectorSSScreen.VehicleSelect)
+            {
+                int index = IndexOfVehicle(selectedVehicle);
+                selectedVehicle = VectorSSCatalog.Vehicles[WrapIndex(index + delta, VectorSSCatalog.Vehicles.Length)];
+                playerProfile.selectedVehicle = selectedVehicle.id;
+                VectorSSSaveSystem.Save(playerProfile);
+            }
+            else if (screen == VectorSSScreen.Garage)
+            {
+                AdjustGarageFocus(delta);
+            }
+        }
+
+        private bool ControllerMenuUp()
+        {
+            return GTXInput.AxisPressedDown("GTX_DPadY", 0.5f, 10) || GTXInput.AxisPressedDown("Vertical", 0.72f, 11);
+        }
+
+        private bool ControllerMenuDown()
+        {
+            return GTXInput.AxisNegativePressedDown("GTX_DPadY", 0.5f, 12) || GTXInput.AxisNegativePressedDown("Vertical", 0.72f, 13);
+        }
+
+        private bool ControllerMenuLeft()
+        {
+            return GTXInput.AxisNegativePressedDown("GTX_DPadX", 0.5f, 14) || GTXInput.AxisNegativePressedDown("Horizontal", 0.72f, 15);
+        }
+
+        private bool ControllerMenuRight()
+        {
+            return GTXInput.AxisPressedDown("GTX_DPadX", 0.5f, 16) || GTXInput.AxisPressedDown("Horizontal", 0.72f, 17);
+        }
+
+        private void ControllerConfirm()
+        {
+            switch (screen)
+            {
+                case VectorSSScreen.MainMenu:
+                    if (menuFocusIndex == 1)
+                    {
+                        screen = VectorSSScreen.Garage;
+                    }
+                    else if (menuFocusIndex == 2)
+                    {
+                        startRaceQueued = true;
+                    }
+                    else
+                    {
+                        screen = VectorSSScreen.MapSelect;
+                    }
+
+                    menuFocusIndex = 0;
+                    break;
+                case VectorSSScreen.MapSelect:
+                    screen = menuFocusIndex == 1 ? VectorSSScreen.MainMenu : VectorSSScreen.VehicleSelect;
+                    menuFocusIndex = 0;
+                    break;
+                case VectorSSScreen.VehicleSelect:
+                    if (menuFocusIndex == 1)
+                    {
+                        screen = VectorSSScreen.MapSelect;
+                        menuFocusIndex = 0;
+                    }
+                    else
+                    {
+                        startRaceQueued = true;
+                    }
+                    break;
+                case VectorSSScreen.Garage:
+                    ActivateGarageFocus();
+                    break;
+                case VectorSSScreen.Results:
+                    if (menuFocusIndex == 0)
+                    {
+                        screen = VectorSSScreen.Garage;
+                    }
+                    else
+                    {
+                        screen = VectorSSScreen.MapSelect;
+                    }
+
+                    menuFocusIndex = 0;
+                    break;
+            }
+        }
+
+        private void ControllerBack()
+        {
+            switch (screen)
+            {
+                case VectorSSScreen.MapSelect:
+                case VectorSSScreen.Garage:
+                case VectorSSScreen.Results:
+                    VectorSSSaveSystem.Save(playerProfile);
+                    screen = VectorSSScreen.MainMenu;
+                    menuFocusIndex = 0;
+                    break;
+                case VectorSSScreen.VehicleSelect:
+                    screen = VectorSSScreen.MapSelect;
+                    menuFocusIndex = 0;
+                    break;
+            }
+        }
+
+        private int MenuFocusCount()
+        {
+            switch (screen)
+            {
+                case VectorSSScreen.MainMenu:
+                    return 3;
+                case VectorSSScreen.MapSelect:
+                case VectorSSScreen.VehicleSelect:
+                case VectorSSScreen.Results:
+                    return 2;
+                case VectorSSScreen.Paused:
+                    return 3;
+                case VectorSSScreen.Garage:
+                    return GarageFocusCount();
+                default:
+                    return 1;
+            }
+        }
+
+        private int GarageFocusCount()
+        {
+            int tuningRows = selectedVehicle != null && selectedVehicle.isBike ? 13 : 11;
+            return tuningRows + 3;
+        }
+
+        private void AdjustGarageFocus(int delta)
+        {
+            const float smallStep = 0.05f;
+            switch (menuFocusIndex)
+            {
+                case 0:
+                    playerProfile.tuning.steering = Mathf.Clamp(playerProfile.tuning.steering + delta * smallStep, 0.45f, 1.85f);
+                    break;
+                case 1:
+                    playerProfile.tuning.brakeBias = Mathf.Clamp(playerProfile.tuning.brakeBias + delta * smallStep, 0.45f, 1.85f);
+                    break;
+                case 2:
+                    playerProfile.tuning.driftGrip = Mathf.Clamp(playerProfile.tuning.driftGrip + delta * smallStep, 0.45f, 1.85f);
+                    break;
+                case 3:
+                    playerProfile.tuning.finalDrive = Mathf.Clamp(playerProfile.tuning.finalDrive + delta * smallStep, 0.65f, 1.45f);
+                    break;
+                case 4:
+                    playerProfile.tuning.boostValve = Mathf.Clamp(playerProfile.tuning.boostValve + delta * smallStep, 0.45f, 1.85f);
+                    break;
+                case 5:
+                    playerProfile.tuning.suspension = Mathf.Clamp(playerProfile.tuning.suspension + delta * smallStep, 0.55f, 1.65f);
+                    break;
+                case 6:
+                    playerProfile.tuning.tireGrip = Mathf.Clamp(playerProfile.tuning.tireGrip + delta * smallStep, 0.55f, 1.85f);
+                    break;
+                case 7:
+                    playerProfile.tuning.clutchBite = Mathf.Clamp(playerProfile.tuning.clutchBite + delta * smallStep, 0.55f, 1.8f);
+                    break;
+                case 8:
+                    playerProfile.tuning.automaticTransmission = delta > 0;
+                    break;
+                case 9:
+                    playerProfile.tuning.outlineThickness = Mathf.Clamp(playerProfile.tuning.outlineThickness + delta * smallStep, 0.65f, 1.6f);
+                    break;
+                case 10:
+                    playerProfile.tuning.cameraShake = Mathf.Clamp01(playerProfile.tuning.cameraShake + delta * smallStep);
+                    break;
+                case 11:
+                    if (selectedVehicle != null && selectedVehicle.isBike)
+                    {
+                        playerProfile.tuning.leanResponse = Mathf.Clamp(playerProfile.tuning.leanResponse + delta * smallStep, 0.45f, 1.8f);
+                    }
+
+                    break;
+                case 12:
+                    if (selectedVehicle != null && selectedVehicle.isBike)
+                    {
+                        playerProfile.tuning.rearBrakeSlide = Mathf.Clamp(playerProfile.tuning.rearBrakeSlide + delta * smallStep, 0.45f, 1.85f);
+                    }
+
+                    break;
+            }
+
+            VectorSSSaveSystem.Save(playerProfile);
+        }
+
+        private void ActivateGarageFocus()
+        {
+            int buttonStart = selectedVehicle != null && selectedVehicle.isBike ? 13 : 11;
+            if (menuFocusIndex == 8)
+            {
+                playerProfile.tuning.automaticTransmission = !playerProfile.tuning.automaticTransmission;
+                VectorSSSaveSystem.Save(playerProfile);
+                return;
+            }
+
+            if (menuFocusIndex == buttonStart)
+            {
+                VectorSSSaveSystem.Save(playerProfile);
+            }
+            else if (menuFocusIndex == buttonStart + 1)
+            {
+                VectorSSSaveSystem.Save(playerProfile);
+                screen = VectorSSScreen.MapSelect;
+                menuFocusIndex = 0;
+            }
+            else if (menuFocusIndex == buttonStart + 2)
+            {
+                VectorSSSaveSystem.Save(playerProfile);
+                screen = VectorSSScreen.MainMenu;
+                menuFocusIndex = 0;
+            }
+        }
+
+        private string GarageFocusLabel(int index)
+        {
+            bool bike = selectedVehicle != null && selectedVehicle.isBike;
+            string[] labels = bike
+                ? new[] { "Steering", "Brake Bias", "Drift Grip", "Final Drive", "Boost Valve", "Suspension", "Tire Grip", "Clutch Bite", "Transmission", "Outline", "Camera Shake", "Lean Response", "Rear Brake Slide", "Save", "Race Again", "Back" }
+                : new[] { "Steering", "Brake Bias", "Drift Grip", "Final Drive", "Boost Valve", "Suspension", "Tire Grip", "Clutch Bite", "Transmission", "Outline", "Camera Shake", "Save", "Race Again", "Back" };
+            return labels[Mathf.Clamp(index, 0, labels.Length - 1)];
+        }
+
+        private static int IndexOfMap(VectorSSMapDefinition map)
+        {
+            for (int i = 0; i < VectorSSCatalog.Maps.Length; i++)
+            {
+                if (VectorSSCatalog.Maps[i] == map || (map != null && VectorSSCatalog.Maps[i].id == map.id))
+                {
+                    return i;
+                }
+            }
+
+            return 0;
+        }
+
+        private static int IndexOfVehicle(VectorSSVehicleDefinition vehicle)
+        {
+            for (int i = 0; i < VectorSSCatalog.Vehicles.Length; i++)
+            {
+                if (VectorSSCatalog.Vehicles[i] == vehicle || (vehicle != null && VectorSSCatalog.Vehicles[i].id == vehicle.id))
+                {
+                    return i;
+                }
+            }
+
+            return 0;
+        }
+
+        private static int WrapIndex(int index, int count)
+        {
+            if (count <= 0)
+            {
+                return 0;
+            }
+
+            int wrapped = index % count;
+            return wrapped < 0 ? wrapped + count : wrapped;
         }
 
         private void DrawTuningSlider(string label, ref float value, float min, float max)
@@ -435,6 +941,18 @@ namespace GTX.Core
             if (!Mathf.Approximately(newValue, value))
             {
                 value = newValue;
+                VectorSSSaveSystem.Save(playerProfile);
+            }
+        }
+
+        private void DrawTransmissionToggle()
+        {
+            bool automatic = playerProfile.tuning.automaticTransmission;
+            string label = automatic ? "Transmission  Automatic" : "Transmission  Manual";
+            bool newValue = GUILayout.Toggle(automatic, label, bodyStyle);
+            if (newValue != automatic)
+            {
+                playerProfile.tuning.automaticTransmission = newValue;
                 VectorSSSaveSystem.Save(playerProfile);
             }
         }
@@ -597,6 +1115,7 @@ namespace GTX.Core
 
         private void StartRace()
         {
+            ResumeRaceTime();
             ClearSession();
             selectedMap = VectorSSCatalog.GetMap(playerProfile.selectedMap);
             selectedVehicle = VectorSSCatalog.GetVehicle(playerProfile.selectedVehicle);
@@ -642,6 +1161,7 @@ namespace GTX.Core
             nextCheckpointIndex = 0;
             raceStartTime = Time.time;
             nextRazorNearMissTime = 0f;
+            racePaused = false;
             screen = VectorSSScreen.Racing;
         }
 
@@ -656,6 +1176,7 @@ namespace GTX.Core
             lastResult = VectorSSProgressionUtility.BuildRaceResult(selectedMap, selectedVehicle, Time.time - raceStartTime, flow01, combatScore);
             playerProfile.resources.Add(lastResult.Total);
             VectorSSSaveSystem.Save(playerProfile);
+            ResumeRaceTime();
             ClearSession();
             SetRaceHudVisible(false);
             screen = VectorSSScreen.Results;
@@ -663,6 +1184,7 @@ namespace GTX.Core
 
         private void ClearSession()
         {
+            racePaused = false;
             hasActivePlayer = false;
             activeRivalAi = null;
             activeModuleController = null;
@@ -676,6 +1198,100 @@ namespace GTX.Core
                 Destroy(sessionRoot.gameObject);
                 sessionRoot = null;
             }
+        }
+
+        private void PauseRace()
+        {
+            if (screen != VectorSSScreen.Racing || !hasActivePlayer)
+            {
+                return;
+            }
+
+            timeScaleBeforePause = Mathf.Approximately(Time.timeScale, 0f) ? 1f : Time.timeScale;
+            Time.timeScale = 0f;
+            racePaused = true;
+            screen = VectorSSScreen.Paused;
+            menuFocusIndex = 0;
+        }
+
+        private void ResumeRace()
+        {
+            if (!racePaused)
+            {
+                return;
+            }
+
+            ResumeRaceTime();
+            screen = VectorSSScreen.Racing;
+            menuFocusIndex = 0;
+        }
+
+        private void ResumeRaceTime()
+        {
+            if (racePaused || Mathf.Approximately(Time.timeScale, 0f))
+            {
+                Time.timeScale = Mathf.Approximately(timeScaleBeforePause, 0f) ? 1f : timeScaleBeforePause;
+            }
+
+            racePaused = false;
+        }
+
+        private void RestartRace()
+        {
+            restartRaceQueued = true;
+        }
+
+        private void LeaveRace()
+        {
+            ResumeRaceTime();
+            ClearSession();
+            SetRaceHudVisible(false);
+            screen = VectorSSScreen.MainMenu;
+            menuFocusIndex = 0;
+        }
+
+        private void HandlePauseMenuInput()
+        {
+            if (PausePressed() || GTXInput.ButtonDown(0) || Input.GetKeyDown(KeyCode.Escape))
+            {
+                ResumeRace();
+                return;
+            }
+
+            if (ControllerMenuDown())
+            {
+                ControllerVertical(1);
+            }
+            else if (ControllerMenuUp())
+            {
+                ControllerVertical(-1);
+            }
+
+            if (GTXInput.ButtonDown(1) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                ActivatePauseFocus();
+            }
+        }
+
+        private void ActivatePauseFocus()
+        {
+            switch (menuFocusIndex)
+            {
+                case 1:
+                    RestartRace();
+                    break;
+                case 2:
+                    LeaveRace();
+                    break;
+                default:
+                    ResumeRace();
+                    break;
+            }
+        }
+
+        private bool PausePressed()
+        {
+            return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P) || GTXInput.ButtonDown(9);
         }
 
         private void SetRaceHudVisible(bool visible)
@@ -825,6 +1441,7 @@ namespace GTX.Core
             titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
             headerStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 0.84f, 0.32f, 1f) } };
             bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true, normal = { textColor = Color.white } };
+            smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, normal = { textColor = new Color(0.78f, 0.9f, 0.96f, 1f) } };
             panelStyle = new GUIStyle(GUI.skin.box);
             panelTexture = new Texture2D(1, 1);
             panelTexture.SetPixel(0, 0, new Color(0.015f, 0.02f, 0.045f, 0.94f));
@@ -835,6 +1452,148 @@ namespace GTX.Core
             scrollStyle = new GUIStyle(GUI.skin.scrollView);
             scrollStyle.normal.background = panelTexture;
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 15, fontStyle = FontStyle.Bold };
+            cardTexture = new Texture2D(1, 1);
+            cardTexture.SetPixel(0, 0, new Color(0.055f, 0.075f, 0.11f, 0.92f));
+            cardTexture.Apply();
+            focusTexture = new Texture2D(1, 1);
+            focusTexture.SetPixel(0, 0, new Color(0.98f, 0.34f, 0.08f, 0.96f));
+            focusTexture.Apply();
+            cardStyle = new GUIStyle(GUI.skin.box) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            cardStyle.normal.background = cardTexture;
+            cardStyle.normal.textColor = Color.white;
+            focusStyle = new GUIStyle(GUI.skin.button) { fontSize = 17, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            focusStyle.normal.background = focusTexture;
+            focusStyle.hover.background = focusTexture;
+            focusStyle.active.background = focusTexture;
+            focusStyle.normal.textColor = Color.white;
+        }
+
+        private void EnsureMenuPreviews()
+        {
+            if (previewRoot != null)
+            {
+                return;
+            }
+
+            previewRoot = new GameObject("Vector SS Menu Preview Rig").transform;
+            previewRoot.position = new Vector3(6200f, 0f, 6200f);
+            mapPreviewTexture = new RenderTexture(720, 420, 16) { name = "Vector SS Stage Preview" };
+            vehiclePreviewTexture = new RenderTexture(720, 420, 16) { name = "Vector SS Vehicle Preview" };
+
+            mapPreviewCamera = CreatePreviewCamera("Stage Preview Camera", previewRoot, new Vector3(-140f, 120f, 0f), Quaternion.Euler(90f, 0f, 0f), mapPreviewTexture, 42f);
+            vehiclePreviewCamera = CreatePreviewCamera("Vehicle Preview Camera", previewRoot, new Vector3(140f, 3.4f, -7.6f), Quaternion.Euler(18f, 0f, 0f), vehiclePreviewTexture, 3.1f);
+            RefreshMenuPreviews(true);
+        }
+
+        private Camera CreatePreviewCamera(string name, Transform parent, Vector3 localPosition, Quaternion localRotation, RenderTexture texture, float orthographicSize)
+        {
+            GameObject cameraObject = new GameObject(name);
+            cameraObject.transform.SetParent(parent, false);
+            cameraObject.transform.localPosition = localPosition;
+            cameraObject.transform.localRotation = localRotation;
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.028f, 0.035f, 0.052f, 1f);
+            camera.orthographic = true;
+            camera.orthographicSize = orthographicSize;
+            camera.nearClipPlane = 0.05f;
+            camera.farClipPlane = 260f;
+            camera.targetTexture = texture;
+            return camera;
+        }
+
+        private void UpdateMenuPreviews()
+        {
+            if (screen == VectorSSScreen.Racing)
+            {
+                return;
+            }
+
+            EnsureMenuPreviews();
+            RefreshMenuPreviews(false);
+            float rotation = Time.deltaTime * 28f;
+            for (int i = 0; i < mapPreviewSpinRoots.Count; i++)
+            {
+                if (mapPreviewSpinRoots[i] != null)
+                {
+                    mapPreviewSpinRoots[i].Rotate(Vector3.up, rotation * 0.35f, Space.World);
+                }
+            }
+
+            if (vehiclePreviewSpinRoot != null)
+            {
+                vehiclePreviewSpinRoot.Rotate(Vector3.up, rotation, Space.World);
+            }
+        }
+
+        private void RefreshMenuPreviews(bool force)
+        {
+            int mapIndex = IndexOfMap(selectedMap);
+            if (force || mapIndex != lastPreviewMapIndex)
+            {
+                BuildMapPreview(selectedMap);
+                lastPreviewMapIndex = mapIndex;
+            }
+
+            int vehicleIndex = IndexOfVehicle(selectedVehicle);
+            if (force || vehicleIndex != lastPreviewVehicleIndex)
+            {
+                BuildVehiclePreview(selectedVehicle);
+                lastPreviewVehicleIndex = vehicleIndex;
+            }
+        }
+
+        private void BuildMapPreview(VectorSSMapDefinition map)
+        {
+            if (previewRoot == null || map == null)
+            {
+                return;
+            }
+
+            Transform old = previewRoot.Find("Stage Preview Root");
+            if (old != null)
+            {
+                Destroy(old.gameObject);
+            }
+
+            ApplyMapPalette(map);
+            Transform root = new GameObject("Stage Preview Root").transform;
+            root.SetParent(previewRoot, false);
+            root.localPosition = new Vector3(-140f, 0f, 0f) - MapBoardCenter(map.id) * 0.18f;
+            root.localScale = Vector3.one * 0.18f;
+            mapPreviewSpinRoots.Clear();
+            mapPreviewSpinRoots.Add(root);
+            BuildTrack(root, map);
+        }
+
+        private void BuildVehiclePreview(VectorSSVehicleDefinition vehicle)
+        {
+            if (previewRoot == null || vehicle == null)
+            {
+                return;
+            }
+
+            Transform old = previewRoot.Find("Vehicle Preview Root");
+            if (old != null)
+            {
+                Destroy(old.gameObject);
+            }
+
+            ApplyVehiclePalette(vehicle);
+            Transform root = new GameObject("Vehicle Preview Root").transform;
+            root.SetParent(previewRoot, false);
+            root.localPosition = new Vector3(140f, -0.42f, 0f);
+            root.localRotation = Quaternion.Euler(0f, 35f, 0f);
+            vehiclePreviewSpinRoot = root;
+            if (vehicle.isBike)
+            {
+                CreateRazorBikeVisuals(root, vehicle);
+            }
+            else
+            {
+                CreateCarVisuals(root, vehicle);
+                CreateWheelVisuals(root, vehicle);
+            }
         }
 
         private Transform CreateResetPoint(Vector3 position, Quaternion rotation)
@@ -1364,12 +2123,19 @@ namespace GTX.Core
             WheelCollider frontRight = CreateWheelCollider(root.transform, "Front Right WheelCollider", wheelPositions[1], wheelRadius, suspension);
             WheelCollider rearLeft = CreateWheelCollider(root.transform, "Rear Left WheelCollider", wheelPositions[2], wheelRadius, suspension);
             WheelCollider rearRight = CreateWheelCollider(root.transform, "Rear Right WheelCollider", wheelPositions[3], wheelRadius, suspension);
+            if (!vehicleDefinition.isBike)
+            {
+                Transform[] wheelVisuals = CreateWheelVisuals(root.transform, vehicleDefinition);
+                VectorSSWheelVisualSync wheelSync = root.AddComponent<VectorSSWheelVisualSync>();
+                wheelSync.Configure(new[] { frontLeft, frontRight, rearLeft, rearRight }, wheelVisuals, Quaternion.Euler(0f, 90f, 0f));
+            }
 
             VehicleTuning tuning = ScriptableObject.CreateInstance<VehicleTuning>();
             tuning.name = "Vector SS Runtime Vehicle Tuning " + vehicleDefinition.displayName;
             VectorSSProgressionUtility.ApplyToVehicleTuning(tuning, vehicleDefinition, playerProfile);
 
             VehicleController vehicle = root.AddComponent<VehicleController>();
+            vehicle.AutomaticTransmission = playerProfile.tuning.automaticTransmission;
             vehicle.Configure(tuning, frontLeft, frontRight, rearLeft, rearRight);
             if (vehicleDefinition.isBike)
             {
@@ -1388,6 +2154,7 @@ namespace GTX.Core
             BoostRamDetector boostRam = root.AddComponent<BoostRamDetector>();
             SpinGuardController spinGuard = root.AddComponent<SpinGuardController>();
             FlowVisualController visuals = root.AddComponent<FlowVisualController>();
+            VectorSSLaunchSmoke launchSmoke = root.AddComponent<VectorSSLaunchSmoke>();
             GTXDrivingFlowBridge flowBridge = root.AddComponent<GTXDrivingFlowBridge>();
             VectorSSVehicleModuleController moduleController = root.AddComponent<VectorSSVehicleModuleController>();
 
@@ -1395,6 +2162,7 @@ namespace GTX.Core
             boostRam.Configure(body, flowState, effects);
             spinGuard.Configure(body, flowState, effects);
             flowBridge.Configure(vehicle, flowState, effects, boostRam, resetPoint);
+            launchSmoke.Configure(vehicle, body, new[] { wheelPositions[2], wheelPositions[3] }, launchSmokeMaterial);
             moduleController.Configure(vehicle, body, flowState, effects, playerProfile, vehicleDefinition);
             float ramMultiplier = VectorSSProgressionUtility.RamMultiplier(vehicleDefinition, playerProfile);
             sideSlam.SetPowerMultiplier(ramMultiplier);
@@ -1419,7 +2187,6 @@ namespace GTX.Core
             CreateRoundedMachineCaps(visualRoot);
             CreateLowPolyFin(visualRoot, "Left Armor Fin", new Vector3(-1.28f * scale.x, 0.88f, -0.5f * scale.z), Quaternion.Euler(0f, 0f, -8f));
             CreateLowPolyFin(visualRoot, "Right Armor Fin", new Vector3(1.28f * scale.x, 0.88f, -0.5f * scale.z), Quaternion.Euler(0f, 180f, 8f));
-            CreateWheelVisuals(visualRoot, vehicleDefinition);
         }
 
         private Transform CreateRazorBikeVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
@@ -1467,9 +2234,9 @@ namespace GTX.Core
             };
         }
 
-        private void CreateWheelVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
+        private Transform[] CreateWheelVisuals(Transform parent, VectorSSVehicleDefinition vehicleDefinition)
         {
-            float x = 1.12f * vehicleDefinition.visualScale.x;
+            float x = 1.2f * vehicleDefinition.visualScale.x;
             float z = 1.38f * vehicleDefinition.visualScale.z;
             Vector3[] positions =
             {
@@ -1479,10 +2246,28 @@ namespace GTX.Core
                 new Vector3(x, 0.43f, -z)
             };
 
+            Transform[] visuals = new Transform[positions.Length];
             for (int i = 0; i < positions.Length; i++)
             {
-                CreateOutlinedPrism(parent, "Player Wheel " + i, 8, positions[i], Quaternion.Euler(0f, 90f, 0f), new Vector3(0.72f, 0.72f, 0.24f), wheelMaterial, 1.06f * playerProfile.tuning.outlineThickness);
+                visuals[i] = CreateWheelVisualAssembly(parent, "Player Wheel " + i, positions[i], vehicleDefinition.visualScale).transform;
             }
+
+            return visuals;
+        }
+
+        private GameObject CreateWheelVisualAssembly(Transform parent, string name, Vector3 localPosition, Vector3 vehicleScale)
+        {
+            GameObject assembly = new GameObject(name + " Visual");
+            assembly.transform.SetParent(parent, false);
+            assembly.transform.localPosition = localPosition;
+            assembly.transform.localRotation = Quaternion.identity;
+
+            float diameter = Mathf.Lerp(0.82f, 0.92f, Mathf.Clamp01((vehicleScale.x + vehicleScale.z - 1.8f) * 0.5f));
+            CreateOutlinedPrism(assembly.transform, name + " Tire", 10, Vector3.zero, Quaternion.identity, new Vector3(diameter, diameter, 0.34f), wheelMaterial, 1.08f * playerProfile.tuning.outlineThickness);
+            CreatePrimitive(name + " Orange Spoke A", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.19f), Quaternion.identity, new Vector3(0.11f, diameter * 0.72f, 0.045f), playerAccentMaterial, false);
+            CreatePrimitive(name + " Blue Spoke B", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.245f), Quaternion.Euler(0f, 0f, 90f), new Vector3(0.09f, diameter * 0.56f, 0.04f), playerSecondaryMaterial, false);
+            CreatePrimitive(name + " Hub", PrimitiveType.Cube, assembly.transform, new Vector3(0f, 0f, 0.29f), Quaternion.identity, new Vector3(0.2f, 0.2f, 0.055f), inkMaterial, false);
+            return assembly;
         }
 
         private void CreateRoundedMachineCaps(Transform parent)
@@ -1584,6 +2369,14 @@ namespace GTX.Core
                 rig = camera.gameObject.AddComponent<GTXCameraRig>();
             }
 
+            GTXPixelFilter pixelFilter = camera.GetComponent<GTXPixelFilter>();
+            if (pixelFilter == null)
+            {
+                pixelFilter = camera.gameObject.AddComponent<GTXPixelFilter>();
+            }
+
+            pixelFilter.PixelFilterEnabled = true;
+            pixelFilter.VerticalResolution = 360;
             rig.Configure(player.root.transform, player.body, player.flowState);
             camera.transform.SetPositionAndRotation(player.root.transform.position + new Vector3(0f, 4.4f, -10f), Quaternion.Euler(18f, 0f, 0f));
             return camera;
@@ -1816,6 +2609,33 @@ namespace GTX.Core
             }
 
             material.renderQueue = 2001;
+            return material;
+        }
+
+        private Material CreateParticleMaterial(string name, Color color)
+        {
+            Shader shader = Shader.Find("Particles/Standard Unlit");
+            if (shader == null)
+            {
+                shader = Shader.Find("Mobile/Particles/Alpha Blended");
+            }
+
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            Material material = new Material(shader) { name = name };
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", color);
+            }
+
             return material;
         }
 

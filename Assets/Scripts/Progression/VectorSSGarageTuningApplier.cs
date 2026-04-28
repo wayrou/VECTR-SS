@@ -14,6 +14,10 @@ namespace GTX.Progression
         public float finalDrive;
         public float steeringAngle;
         public float steeringAngleAtSpeed;
+        public float steeringInputRiseRate;
+        public float steeringInputFallRate;
+        public float lowSpeedSteeringAssist;
+        public float highSpeedSteeringStability;
         public float brakeTorque;
         public float maxDriveTorque;
         public float rigidbodyFallbackDriveForce;
@@ -22,6 +26,14 @@ namespace GTX.Progression
         public float driftSideGrip;
         public float normalSideGrip;
         public float handbrakeRearGrip;
+        public float driftSustain;
+        public float driftExitRecovery;
+        public float driftExitYawDamping;
+        public float driftExitHoldSeconds;
+        public float driftLateralDamping;
+        public float driftHandbrakeEntryKick;
+        public float driftHandbrakeEntryDuration;
+        public float driftThrottleInfluence;
         public float boostCapacity;
         public float boostBurnPerSecond;
         public float boostRegenPerSecond;
@@ -53,6 +65,10 @@ namespace GTX.Progression
             finalDrive = tuning.finalDrive;
             steeringAngle = tuning.steeringAngle;
             steeringAngleAtSpeed = tuning.steeringAngleAtSpeed;
+            steeringInputRiseRate = tuning.steeringInputRiseRate;
+            steeringInputFallRate = tuning.steeringInputFallRate;
+            lowSpeedSteeringAssist = tuning.lowSpeedSteeringAssist;
+            highSpeedSteeringStability = tuning.highSpeedSteeringStability;
             brakeTorque = tuning.brakeTorque;
             maxDriveTorque = tuning.maxDriveTorque;
             rigidbodyFallbackDriveForce = tuning.rigidbodyFallbackDriveForce;
@@ -61,6 +77,14 @@ namespace GTX.Progression
             driftSideGrip = tuning.driftSideGrip;
             normalSideGrip = tuning.normalSideGrip;
             handbrakeRearGrip = tuning.handbrakeRearGrip;
+            driftSustain = tuning.driftSustain;
+            driftExitRecovery = tuning.driftExitRecovery;
+            driftExitYawDamping = tuning.driftExitYawDamping;
+            driftExitHoldSeconds = tuning.driftExitHoldSeconds;
+            driftLateralDamping = tuning.driftLateralDamping;
+            driftHandbrakeEntryKick = tuning.driftHandbrakeEntryKick;
+            driftHandbrakeEntryDuration = tuning.driftHandbrakeEntryDuration;
+            driftThrottleInfluence = tuning.driftThrottleInfluence;
             boostCapacity = tuning.boostCapacity;
             boostBurnPerSecond = tuning.boostBurnPerSecond;
             boostRegenPerSecond = tuning.boostRegenPerSecond;
@@ -167,12 +191,24 @@ namespace GTX.Progression
 
             tuning.steeringAngle = Mathf.Clamp(source.steeringAngle * stats.steering, 12f, 58f);
             tuning.steeringAngleAtSpeed = Mathf.Clamp(source.steeringAngleAtSpeed * Mathf.Lerp(0.94f, 1.16f, Mathf.InverseLerp(0.75f, 1.35f, stats.steering)), 4f, 22f);
-            tuning.arcadeYawAssist = Mathf.Max(0f, source.arcadeYawAssist * Mathf.Lerp(0.85f, 1.28f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)) * Mathf.Lerp(0.92f, 1.1f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
+            tuning.arcadeYawAssist = Mathf.Max(0f, source.arcadeYawAssist * Mathf.Lerp(0.9f, 1.08f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)) * Mathf.Lerp(0.96f, 1.04f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
             tuning.tractionControl = Mathf.Clamp01(source.tractionControl * Mathf.Lerp(0.92f, 1.24f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
+            tuning.steeringInputRiseRate = Mathf.Max(0.1f, source.steeringInputRiseRate * Mathf.Lerp(0.9f, 1.32f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)));
+            tuning.steeringInputFallRate = Mathf.Max(0.1f, source.steeringInputFallRate * Mathf.Lerp(0.96f, 1.22f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)));
+            tuning.lowSpeedSteeringAssist = Mathf.Max(0f, source.lowSpeedSteeringAssist * Mathf.Lerp(0.88f, 1.18f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)));
+            tuning.highSpeedSteeringStability = Mathf.Max(0f, source.highSpeedSteeringStability * Mathf.Lerp(1.16f, 0.9f, Mathf.InverseLerp(0.7f, 1.45f, stats.steering)) * Mathf.Lerp(0.92f, 1.18f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
 
             tuning.normalSideGrip = Mathf.Max(0.2f, source.normalSideGrip * stats.grip);
             tuning.driftSideGrip = Mathf.Clamp(source.driftSideGrip * stats.drift * Mathf.Lerp(1.08f, 0.92f, Mathf.InverseLerp(0.85f, 1.35f, stats.grip)), 0.24f, 1.35f);
             tuning.handbrakeRearGrip = Mathf.Clamp(source.handbrakeRearGrip / Mathf.Max(0.72f, stats.grip), 0.18f, 0.9f);
+            tuning.driftSustain = Mathf.Max(0f, source.driftSustain * Mathf.Lerp(0.88f, 1.22f, Mathf.InverseLerp(0.75f, 1.35f, stats.drift)));
+            tuning.driftExitRecovery = Mathf.Max(0.25f, source.driftExitRecovery * Mathf.Lerp(1.18f, 0.86f, Mathf.InverseLerp(0.75f, 1.35f, stats.drift)) * Mathf.Lerp(0.94f, 1.14f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
+            tuning.driftExitYawDamping = Mathf.Max(0f, source.driftExitYawDamping * Mathf.Lerp(0.92f, 1.22f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
+            tuning.driftExitHoldSeconds = Mathf.Max(0f, source.driftExitHoldSeconds * Mathf.Lerp(1.08f, 0.88f, Mathf.InverseLerp(0.75f, 1.35f, stats.stability)));
+            tuning.driftLateralDamping = Mathf.Max(0f, source.driftLateralDamping * Mathf.Lerp(0.92f, 1.16f, Mathf.InverseLerp(0.75f, 1.35f, stats.grip)));
+            tuning.driftHandbrakeEntryKick = Mathf.Max(0f, source.driftHandbrakeEntryKick * Mathf.Lerp(0.9f, 1.18f, Mathf.InverseLerp(0.75f, 1.35f, stats.drift)));
+            tuning.driftHandbrakeEntryDuration = Mathf.Max(0.05f, source.driftHandbrakeEntryDuration * Mathf.Lerp(0.92f, 1.12f, Mathf.InverseLerp(0.75f, 1.35f, stats.drift)));
+            tuning.driftThrottleInfluence = Mathf.Max(0f, source.driftThrottleInfluence * Mathf.Lerp(0.92f, 1.12f, Mathf.InverseLerp(0.75f, 1.35f, stats.acceleration)));
             tuning.brakeTorque = Mathf.Max(500f, source.brakeTorque * stats.brake);
 
             tuning.boostCapacity = Mathf.Max(15f, source.boostCapacity * stats.boostCapacity);

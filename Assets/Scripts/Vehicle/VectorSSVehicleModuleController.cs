@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GTX.Core;
 using GTX.Data;
 using GTX.Flow;
 using GTX.Progression;
@@ -262,17 +263,19 @@ namespace GTX.Vehicle
             {
                 tuning.handbrakeRearGrip *= 1.18f;
                 tuning.driftYawAssist *= 1.08f;
+                tuning.driftHandbrakeEntryKick *= 1.14f;
+                tuning.driftSustain *= 1.06f;
             }
         }
 
         private void HandleInputs()
         {
-            if (HasModule(ClutchKickId) && Input.GetKeyDown(KeyCode.X))
+            if (HasModule(ClutchKickId) && (Input.GetKeyDown(KeyCode.X) || GTXInput.ButtonDown(8)))
             {
                 TryClutchKickAssist();
             }
 
-            if (HasModule(BoostValveId) && Input.GetKeyDown(KeyCode.V))
+            if (HasModule(BoostValveId) && (Input.GetKeyDown(KeyCode.V) || GTXInput.AxisPressedDown("GTX_DPadY", 0.5f, 4)))
             {
                 boostValveMode = (boostValveMode + 1) % 3;
                 RaiseFeedback("BOOST VALVE " + BoostValveLabel());
@@ -280,13 +283,13 @@ namespace GTX.Vehicle
 
             if (HasModule(BrakeBiasId))
             {
-                if (Input.GetKeyDown(KeyCode.LeftBracket) || Input.GetKeyDown(KeyCode.Comma))
+                if (Input.GetKeyDown(KeyCode.LeftBracket) || Input.GetKeyDown(KeyCode.Comma) || GTXInput.AxisNegativePressedDown("GTX_DPadX", 0.5f, 2))
                 {
                     brakeBias = Mathf.Clamp01(brakeBias - 0.1f);
                     RaiseFeedback("BRAKE BIAS " + Mathf.RoundToInt(brakeBias * 100f) + "% F");
                 }
 
-                if (Input.GetKeyDown(KeyCode.RightBracket) || Input.GetKeyDown(KeyCode.Period))
+                if (Input.GetKeyDown(KeyCode.RightBracket) || Input.GetKeyDown(KeyCode.Period) || GTXInput.AxisPressedDown("GTX_DPadX", 0.5f, 3))
                 {
                     brakeBias = Mathf.Clamp01(brakeBias + 0.1f);
                     RaiseFeedback("BRAKE BIAS " + Mathf.RoundToInt(brakeBias * 100f) + "% F");
@@ -304,7 +307,7 @@ namespace GTX.Vehicle
                 TryDeployArmor();
             }
 
-            if (HasModule(SnapLeanId) && vehicleDefinition.isBike && Input.GetKeyDown(KeyCode.LeftAlt))
+            if (HasModule(SnapLeanId) && vehicleDefinition.isBike && (Input.GetKeyDown(KeyCode.LeftAlt) || GTXInput.ButtonDown(9)))
             {
                 TrySnapLean();
             }
@@ -397,6 +400,13 @@ namespace GTX.Vehicle
             tuning.tractionControl = differentialLocked && HasModule(DifferentialLockId) ? Mathf.Max(baseline.tractionControl, 0.58f) : baseline.tractionControl;
             tuning.handbrakeRearGrip = baseline.handbrakeRearGrip * (HasModule(RearBrakeSlideId) ? 1.18f : 1f);
             tuning.driftYawAssist = baseline.driftYawAssist * (HasModule(RearBrakeSlideId) ? 1.08f : 1f);
+            tuning.driftHandbrakeEntryKick = baseline.driftHandbrakeEntryKick * (HasModule(RearBrakeSlideId) ? 1.14f : 1f) * (differentialLocked && HasModule(DifferentialLockId) ? 0.88f : 1f);
+            tuning.driftHandbrakeEntryDuration = baseline.driftHandbrakeEntryDuration * (HasModule(RearBrakeSlideId) ? 1.06f : 1f);
+            tuning.driftSustain = baseline.driftSustain * (HasModule(RearBrakeSlideId) ? 1.06f : 1f) * (differentialLocked && HasModule(DifferentialLockId) ? 0.92f : 1f);
+            tuning.driftExitRecovery = baseline.driftExitRecovery * (differentialLocked && HasModule(DifferentialLockId) ? 1.12f : 1f);
+            tuning.driftExitYawDamping = baseline.driftExitYawDamping * (differentialLocked && HasModule(DifferentialLockId) ? 1.18f : 1f);
+            tuning.driftExitHoldSeconds = baseline.driftExitHoldSeconds;
+            tuning.highSpeedSteeringStability = baseline.highSpeedSteeringStability * (differentialLocked && HasModule(DifferentialLockId) ? 1.16f : 1f);
 
             if (vehicle != null)
             {
@@ -461,6 +471,13 @@ namespace GTX.Vehicle
             public readonly float tractionControl;
             public readonly float handbrakeRearGrip;
             public readonly float driftYawAssist;
+            public readonly float driftHandbrakeEntryKick;
+            public readonly float driftHandbrakeEntryDuration;
+            public readonly float driftSustain;
+            public readonly float driftExitRecovery;
+            public readonly float driftExitYawDamping;
+            public readonly float driftExitHoldSeconds;
+            public readonly float highSpeedSteeringStability;
             public readonly float bodyMass;
             public readonly float angularDrag;
 
@@ -475,6 +492,13 @@ namespace GTX.Vehicle
                 tractionControl = tuning != null ? tuning.tractionControl : 0.28f;
                 handbrakeRearGrip = tuning != null ? tuning.handbrakeRearGrip : 0.24f;
                 driftYawAssist = tuning != null ? tuning.driftYawAssist : 2.65f;
+                driftHandbrakeEntryKick = tuning != null ? tuning.driftHandbrakeEntryKick : 1f;
+                driftHandbrakeEntryDuration = tuning != null ? tuning.driftHandbrakeEntryDuration : 0.28f;
+                driftSustain = tuning != null ? tuning.driftSustain : 0.68f;
+                driftExitRecovery = tuning != null ? tuning.driftExitRecovery : 2.35f;
+                driftExitYawDamping = tuning != null ? tuning.driftExitYawDamping : 7.2f;
+                driftExitHoldSeconds = tuning != null ? tuning.driftExitHoldSeconds : 0.42f;
+                highSpeedSteeringStability = tuning != null ? tuning.highSpeedSteeringStability : 0.18f;
                 bodyMass = body != null ? body.mass : tuning != null ? tuning.mass : 1350f;
                 angularDrag = body != null ? body.angularDrag : 1.2f;
             }

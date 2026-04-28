@@ -1,3 +1,4 @@
+using GTX.Core;
 using GTX.Flow;
 using GTX.Visuals;
 using System;
@@ -65,11 +66,11 @@ namespace GTX.Combat
 
         private void Update()
         {
-            if (Input.GetKeyDown(slamLeftKey))
+            if (Input.GetKeyDown(slamLeftKey) || GTXInput.AxisNegativePressedDown("GTX_RightStickX", 0.72f, 0))
             {
                 TrySideSlam(-1f);
             }
-            else if (Input.GetKeyDown(slamRightKey))
+            else if (Input.GetKeyDown(slamRightKey) || GTXInput.AxisPressedDown("GTX_RightStickX", 0.72f, 1))
             {
                 TrySideSlam(1f);
             }

@@ -25,22 +25,14 @@ namespace GTX.Vehicle
             }
 
             float freeRevTarget = Mathf.Lerp(tuning.idleRpm, tuning.redlineRpm, Mathf.Clamp01(throttle));
-            float coupledTarget = Mathf.Max(tuning.stallRpm, drivetrainRpm);
+            float coupledTarget = Mathf.Max(tuning.idleRpm, drivetrainRpm);
             float targetRpm = Mathf.Lerp(freeRevTarget, coupledTarget, Mathf.Clamp01(clutchTransfer));
 
             Rpm = Mathf.Lerp(Rpm, targetRpm, 1f - Mathf.Exp(-tuning.rpmResponse * deltaTime));
-            Rpm = Mathf.Clamp(Rpm, 0f, tuning.redlineRpm * 1.05f);
-            IsStalled = Rpm < tuning.stallRpm && throttle < 0.05f;
-            if (IsStalled)
-            {
-                Rpm = Mathf.MoveTowards(Rpm, 0f, tuning.idleRpm * deltaTime);
-            }
-            else if (Rpm < tuning.idleRpm && throttle > 0.02f)
-            {
-                Rpm = Mathf.MoveTowards(Rpm, tuning.idleRpm, tuning.idleRpm * deltaTime);
-            }
+            Rpm = Mathf.Clamp(Rpm, tuning.idleRpm, tuning.redlineRpm * 1.05f);
+            IsStalled = false;
 
-            NormalizedRpm = Mathf.InverseLerp(tuning.idleRpm, tuning.redlineRpm, Rpm);
+            NormalizedRpm = Mathf.Clamp01(Mathf.InverseLerp(tuning.idleRpm, tuning.redlineRpm, Rpm));
         }
 
         public float GetCrankTorque(VehicleTuning tuning, float throttle)

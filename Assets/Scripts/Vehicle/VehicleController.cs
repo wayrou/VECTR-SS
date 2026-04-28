@@ -40,6 +40,7 @@ namespace GTX.Vehicle
         public string Feedback => BuildFeedback();
         public float ClutchTransfer { get; private set; }
         public float RuntimeBrakeBias { get; set; } = 0.5f;
+        public bool AutomaticTransmission { get; set; }
 
         private Rigidbody body;
         private WheelCollider[] driveWheels;
@@ -48,11 +49,13 @@ namespace GTX.Vehicle
         private bool hasBaseCenterOfMass;
         private Vector3 collisionRecoveryNormal;
         private float collisionRecoveryTimer;
+        private VehicleInputState externalInput;
+        private float shapedSteer;
 
         public void SetInput(VehicleInputState input)
         {
             readUnityInput = false;
-            CurrentInput = input;
+            externalInput = input;
         }
 
         public void Configure(VehicleTuning newTuning, WheelCollider newFrontLeft, WheelCollider newFrontRight, WheelCollider newRearLeft, WheelCollider newRearRight)
@@ -110,11 +113,30 @@ namespace GTX.Vehicle
 
             if (readUnityInput)
             {
-                CurrentInput = VehicleInputState.FromUnityInput();
+                externalInput = VehicleInputState.FromUnityInput();
             }
 
             float dt = Time.fixedDeltaTime;
-            gearbox.Tick(tuning, CurrentInput, engine.Rpm, dt);
+            CurrentInput = ShapeInput(externalInput, dt);
+            if (AutomaticTransmission)
+            {
+                CurrentInput = ApplyAutomaticTransmissionInput(CurrentInput, dt);
+            }
+
+            if (AutomaticTransmission)
+            {
+                VehicleInputState gearboxInput = CurrentInput;
+                gearboxInput.shiftUp = false;
+                gearboxInput.shiftDown = false;
+                gearboxInput.shiftDownHeld = false;
+                gearbox.Tick(tuning, gearboxInput, engine.Rpm, dt);
+                ApplyAutomaticShiftRequests(CurrentInput);
+            }
+            else
+            {
+                gearbox.Tick(tuning, CurrentInput, engine.Rpm, dt);
+            }
+
             boost.Tick(tuning, CurrentInput.boost, CurrentInput.throttle, dt);
             drift.Tick(tuning, body, CurrentInput, dt);
 
@@ -155,6 +177,136 @@ namespace GTX.Vehicle
             gearbox.Reset(tuning);
             boost.Reset(tuning);
             drift.Reset();
+            shapedSteer = 0f;
+        }
+
+        private VehicleInputState ShapeInput(VehicleInputState input, float deltaTime)
+        {
+            float targetSteer = Mathf.Clamp(input.steer, -1f, 1f);
+            bool returningToCenter = Mathf.Abs(targetSteer) < Mathf.Abs(shapedSteer) || Mathf.Sign(targetSteer) != Mathf.Sign(shapedSteer);
+            float rate = returningToCenter ? tuning.steeringInputFallRate : tuning.steeringInputRiseRate;
+            shapedSteer = Mathf.MoveTowards(shapedSteer, targetSteer, Mathf.Max(0.1f, rate) * deltaTime);
+            input.steer = Mathf.Clamp(shapedSteer, -1f, 1f);
+            return input;
+        }
+
+        private void ApplyAutomaticShiftRequests(VehicleInputState input)
+        {
+            if (input.shiftDownHeld && gearbox.CurrentGear != GearboxController.ReverseGear)
+            {
+                gearbox.RequestShift(tuning, GearboxController.ReverseGear, engine.Rpm, false);
+            }
+            else if (input.shiftUp)
+            {
+                gearbox.RequestShift(tuning, gearbox.CurrentGear + 1, engine.Rpm, false);
+            }
+            else if (input.shiftDown)
+            {
+                gearbox.RequestShift(tuning, gearbox.CurrentGear - 1, engine.Rpm, false);
+            }
+        }
+
+        private VehicleInputState ApplyAutomaticTransmissionInput(VehicleInputState input, float deltaTime)
+        {
+            input.shiftUp = false;
+            input.shiftDown = false;
+            input.shiftDownHeld = false;
+            input.clutch = 0f;
+
+            float forwardSpeed = body != null ? Vector3.Dot(body.velocity, transform.forward) : 0f;
+            bool reverseHeld = input.brake > 0.08f && input.throttle < 0.08f;
+            bool forwardHeld = input.throttle > 0.08f;
+
+            if (reverseHeld && forwardSpeed <= 0.45f)
+            {
+                float reversePower = Mathf.Clamp01(input.brake);
+                if (gearbox.CurrentGear != GearboxController.ReverseGear)
+                {
+                    gearbox.ForceShiftImmediate(tuning, GearboxController.ReverseGear);
+                }
+
+                input.shiftDownHeld = false;
+                input.shiftDown = false;
+                input.throttle = reversePower;
+                input.brake = 0f;
+                return input;
+            }
+
+            if (gearbox.CurrentGear == GearboxController.ReverseGear && forwardHeld)
+            {
+                gearbox.ForceShiftImmediate(tuning, GearboxController.MinForwardGear);
+            }
+
+            if (gearbox.CurrentGear <= GearboxController.NeutralGear && forwardHeld)
+            {
+                input.shiftUp = true;
+                return input;
+            }
+
+            if (gearbox.CurrentGear < GearboxController.MinForwardGear || gearbox.IsShifting)
+            {
+                return input;
+            }
+
+            int maxForwardGear = tuning.forwardRatios != null && tuning.forwardRatios.Length > 0 ? Mathf.Min(GearboxController.MaxForwardGear, tuning.forwardRatios.Length) : GearboxController.MaxForwardGear;
+            int speedTargetGear = CalculateAutomaticTargetGear(maxForwardGear);
+            if (speedTargetGear > gearbox.CurrentGear)
+            {
+                input.shiftUp = true;
+                return input;
+            }
+
+            if (speedTargetGear < gearbox.CurrentGear)
+            {
+                input.shiftDown = true;
+                return input;
+            }
+
+            float throttle01 = Mathf.Clamp01(input.throttle);
+            float upshiftRpm = Mathf.Lerp(tuning.perfectShiftRpmMin * 0.9f, tuning.perfectShiftRpmMax * 1.01f, throttle01);
+            float downshiftRpm = Mathf.Lerp(tuning.idleRpm + 950f, tuning.perfectShiftRpmMin * 0.64f, throttle01);
+
+            if (engine.Rpm >= upshiftRpm && gearbox.CurrentGear < maxForwardGear)
+            {
+                input.shiftUp = true;
+            }
+            else if (engine.Rpm <= downshiftRpm && gearbox.CurrentGear > GearboxController.MinForwardGear && SpeedMetersPerSecond > 5.5f)
+            {
+                input.shiftDown = true;
+            }
+
+            return input;
+        }
+
+        private int CalculateAutomaticTargetGear(int maxForwardGear)
+        {
+            float speed = SpeedMetersPerSecond;
+            if (speed < 11f)
+            {
+                return GearboxController.MinForwardGear;
+            }
+
+            if (speed < 19f)
+            {
+                return Mathf.Min(2, maxForwardGear);
+            }
+
+            if (speed < 28f)
+            {
+                return Mathf.Min(3, maxForwardGear);
+            }
+
+            if (speed < 38f)
+            {
+                return Mathf.Min(4, maxForwardGear);
+            }
+
+            if (speed < 50f)
+            {
+                return Mathf.Min(5, maxForwardGear);
+            }
+
+            return maxForwardGear;
         }
 
         private float CalculateClutchTransfer(float clutchInput)
@@ -196,7 +348,9 @@ namespace GTX.Vehicle
         private void ApplyWheelControls()
         {
             float speed01 = Mathf.InverseLerp(0f, tuning.steeringSpeedReference, SpeedMetersPerSecond);
-            float steerAngle = Mathf.Lerp(tuning.steeringAngle, tuning.steeringAngleAtSpeed, speed01) * CurrentInput.steer;
+            float lowSpeedAssist = Mathf.Lerp(1f + tuning.lowSpeedSteeringAssist, 1f, speed01);
+            float highSpeedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability), speed01);
+            float steerAngle = Mathf.Lerp(tuning.steeringAngle, tuning.steeringAngleAtSpeed, speed01) * lowSpeedAssist * highSpeedStability * CurrentInput.steer;
             SetSteer(frontLeft, steerAngle);
             SetSteer(frontRight, steerAngle);
 
@@ -302,9 +456,12 @@ namespace GTX.Vehicle
 
         private void ApplyWheelGrip()
         {
-            float rearGrip = CurrentInput.handbrake ? tuning.handbrakeRearGrip : Mathf.Lerp(tuning.normalSideGrip, tuning.driftSideGrip, drift.DriftAmount);
-            SetSideGrip(frontLeft, tuning.normalSideGrip);
-            SetSideGrip(frontRight, tuning.normalSideGrip);
+            float entryGrip = Mathf.Min(tuning.handbrakeRearGrip, tuning.driftSideGrip);
+            float driftGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.driftSideGrip, drift.DriftAmount);
+            float rearGrip = CurrentInput.handbrake ? Mathf.Lerp(driftGrip, entryGrip, drift.EntryAmount) : driftGrip;
+            float frontGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.normalSideGrip * 1.06f, drift.CounterSteerAmount * drift.DriftAmount);
+            SetSideGrip(frontLeft, frontGrip);
+            SetSideGrip(frontRight, frontGrip);
             SetSideGrip(rearLeft, rearGrip);
             SetSideGrip(rearRight, rearGrip);
         }
@@ -318,7 +475,15 @@ namespace GTX.Vehicle
 
             float speed = SpeedMetersPerSecond;
             body.AddForce(-transform.up * tuning.downforce * speed, ForceMode.Force);
-            body.AddRelativeTorque(Vector3.up * CurrentInput.steer * tuning.arcadeYawAssist * Mathf.Clamp01(speed / 25f), ForceMode.Acceleration);
+            float lowSpeedYawAssist = Mathf.InverseLerp(18f, 3f, speed) * 0.35f;
+            float handbrakeYawAssist = CurrentInput.handbrake ? Mathf.InverseLerp(tuning.driftMinSpeed, tuning.driftMinSpeed + 10f, speed) : 0f;
+            float yawAssist = Mathf.Max(lowSpeedYawAssist, handbrakeYawAssist);
+            if (yawAssist > 0.001f)
+            {
+                float speedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability), Mathf.InverseLerp(18f, 58f, speed));
+                body.AddRelativeTorque(Vector3.up * CurrentInput.steer * tuning.arcadeYawAssist * speedStability * yawAssist, ForceMode.Acceleration);
+            }
+
             ApplyLaunchAndCollisionRecovery(deltaTime);
             drift.ApplyArcadeAssist(tuning, body, CurrentInput, deltaTime);
         }
@@ -406,9 +571,14 @@ namespace GTX.Vehicle
                 return "BOOST OVERHEAT";
             }
 
+            if (AutomaticTransmission && gearbox.LastShiftAge < 0.35f && gearbox.LastShiftQuality == ShiftQuality.None)
+            {
+                return "AUTO SHIFT";
+            }
+
             if (gearbox.ReverseHoldProgress > 0.15f && gearbox.CurrentGear != GearboxController.ReverseGear)
             {
-                return "HOLD Q FOR REVERSE";
+                return AutomaticTransmission ? "HOLD BRAKE FOR REVERSE" : "HOLD Q FOR REVERSE";
             }
 
             if (gearbox.LastShiftAge < tuning.shiftJudgementWindow)

@@ -13,6 +13,7 @@ namespace GTX.Progression
         VehicleSelect,
         Garage,
         Racing,
+        Paused,
         Results
     }
 
@@ -128,6 +129,7 @@ namespace GTX.Progression
         [Range(0f, 1f)] public float cameraShake = 0.5f;
         [Range(0.45f, 1.8f)] public float leanResponse = 1f;
         [Range(0.45f, 1.85f)] public float rearBrakeSlide = 1f;
+        public bool automaticTransmission;
 
         public void CopyFrom(VectorSSTuningState other)
         {
@@ -148,6 +150,7 @@ namespace GTX.Progression
             cameraShake = other.cameraShake;
             leanResponse = other.leanResponse;
             rearBrakeSlide = other.rearBrakeSlide;
+            automaticTransmission = other.automaticTransmission;
         }
     }
 
@@ -215,7 +218,7 @@ namespace GTX.Progression
         public string displayName;
         public string theme;
         public string purpose;
-        public int lapCount = 1;
+        public int lapCount = 3;
         public VectorSSResources baseReward;
         public VectorSSResources mapBonus;
         public Color roadColor;
@@ -599,7 +602,7 @@ namespace GTX.Progression
                 displayName = "Blackline Circuit",
                 purpose = "Intro city/highway map",
                 theme = "Elevated cel-shaded city/highway with balanced driving.",
-                lapCount = 1,
+                lapCount = 3,
                 baseReward = new VectorSSResources(32, 30, 30),
                 mapBonus = new VectorSSResources(14, 12, 12),
                 roadColor = new Color(0.17f, 0.19f, 0.21f, 1f),
@@ -612,7 +615,7 @@ namespace GTX.Progression
                 displayName = "Scrapline Yard",
                 purpose = "Combat-focused industrial map",
                 theme = "Containers, cranes, scrap props, and wide lanes.",
-                lapCount = 1,
+                lapCount = 3,
                 baseReward = new VectorSSResources(36, 22, 22),
                 mapBonus = new VectorSSResources(36, 8, 8),
                 roadColor = new Color(0.20f, 0.20f, 0.18f, 1f),
@@ -625,7 +628,7 @@ namespace GTX.Progression
                 displayName = "Rubber Ridge",
                 purpose = "Drift/jump mountain map",
                 theme = "Canyon hairpins, tire walls, jumps, and a narrow bike line.",
-                lapCount = 1,
+                lapCount = 3,
                 baseReward = new VectorSSResources(24, 24, 38),
                 mapBonus = new VectorSSResources(8, 10, 38),
                 roadColor = new Color(0.18f, 0.19f, 0.20f, 1f),
@@ -671,7 +674,7 @@ namespace GTX.Progression
                 slot = VectorSSModuleSlot.Control,
                 widget = VectorSSModuleWidget.ClutchKick,
                 cost = new VectorSSResources(25, 0, 45),
-                controlHint = "X clutch kick",
+                controlHint = "X / L3 clutch kick",
                 defaultHudPosition = new Vector2(1488f, -268f)
             },
             new VectorSSModuleDefinition
@@ -683,7 +686,7 @@ namespace GTX.Progression
                 slot = VectorSSModuleSlot.Control,
                 widget = VectorSSModuleWidget.BoostValve,
                 cost = new VectorSSResources(25, 50, 0),
-                controlHint = "V boost valve",
+                controlHint = "V / D-pad up boost valve",
                 defaultHudPosition = new Vector2(1488f, -326f)
             },
             new VectorSSModuleDefinition
@@ -695,7 +698,7 @@ namespace GTX.Progression
                 slot = VectorSSModuleSlot.Control,
                 widget = VectorSSModuleWidget.BrakeBias,
                 cost = new VectorSSResources(0, 25, 30),
-                controlHint = "[/] brake bias",
+                controlHint = "[/] / D-pad left-right brake bias",
                 defaultHudPosition = new Vector2(1488f, -384f)
             },
             new VectorSSModuleDefinition
@@ -707,7 +710,7 @@ namespace GTX.Progression
                 slot = VectorSSModuleSlot.Control,
                 widget = VectorSSModuleWidget.DifferentialLock,
                 cost = new VectorSSResources(60, 0, 20),
-                controlHint = "G diff lock",
+                controlHint = "G / Start diff lock",
                 defaultHudPosition = new Vector2(1488f, -442f)
             },
             new VectorSSModuleDefinition
@@ -719,7 +722,7 @@ namespace GTX.Progression
                 slot = VectorSSModuleSlot.Combat,
                 widget = VectorSSModuleWidget.ArmorPlate,
                 cost = new VectorSSResources(80, 20, 0),
-                controlHint = "B armor plates",
+                controlHint = "B / B-button armor plates",
                 defaultHudPosition = new Vector2(1488f, -500f)
             },
             new VectorSSModuleDefinition
@@ -732,7 +735,7 @@ namespace GTX.Progression
                 widget = VectorSSModuleWidget.SnapLean,
                 cost = new VectorSSResources(0, 35, 45),
                 allowedVehicle = VectorSSVehicleId.Razor,
-                controlHint = "Left Alt snap lean",
+                controlHint = "Left Alt / R3 snap lean",
                 defaultHudPosition = new Vector2(1488f, -558f)
             },
             new VectorSSModuleDefinition
@@ -745,7 +748,7 @@ namespace GTX.Progression
                 widget = VectorSSModuleWidget.RearBrakeSlide,
                 cost = new VectorSSResources(20, 0, 50),
                 allowedVehicle = VectorSSVehicleId.Razor,
-                controlHint = "Space rear slide",
+                controlHint = "Space / A-button rear slide",
                 defaultHudPosition = new Vector2(1488f, -616f)
             }
         };
@@ -868,6 +871,7 @@ namespace GTX.Progression
             tuning.cameraShake = PlayerPrefs.GetFloat(Prefix + "Tune.CameraShake", tuning.cameraShake);
             tuning.leanResponse = PlayerPrefs.GetFloat(Prefix + "Tune.LeanResponse", tuning.leanResponse);
             tuning.rearBrakeSlide = PlayerPrefs.GetFloat(Prefix + "Tune.RearBrakeSlide", tuning.rearBrakeSlide);
+            tuning.automaticTransmission = PlayerPrefs.GetInt(Prefix + "Tune.AutomaticTransmission", tuning.automaticTransmission ? 1 : 0) == 1;
         }
 
         private static void SaveTuning(VectorSSTuningState tuning)
@@ -884,6 +888,7 @@ namespace GTX.Progression
             PlayerPrefs.SetFloat(Prefix + "Tune.CameraShake", tuning.cameraShake);
             PlayerPrefs.SetFloat(Prefix + "Tune.LeanResponse", tuning.leanResponse);
             PlayerPrefs.SetFloat(Prefix + "Tune.RearBrakeSlide", tuning.rearBrakeSlide);
+            PlayerPrefs.SetInt(Prefix + "Tune.AutomaticTransmission", tuning.automaticTransmission ? 1 : 0);
         }
 
         private static void LoadModules(VectorSSPlayerProfile profile)
@@ -1096,12 +1101,25 @@ namespace GTX.Progression
             tuning.rigidbodyFallbackDriveForce *= vehicle.engineMultiplier;
             tuning.steeringAngle *= vehicle.steeringMultiplier * t.steering;
             tuning.steeringAngleAtSpeed *= Mathf.Lerp(0.82f, 1.22f, Mathf.InverseLerp(0.45f, 1.85f, t.steering));
-            tuning.arcadeYawAssist *= vehicle.steeringMultiplier * t.suspension;
+            float steering01 = Mathf.InverseLerp(0.45f, 1.85f, t.steering);
+            tuning.arcadeYawAssist *= Mathf.Lerp(0.85f, 1.12f, steering01) * Mathf.Lerp(0.95f, 1.05f, Mathf.InverseLerp(0.55f, 1.65f, t.suspension));
+            tuning.steeringInputRiseRate *= Mathf.Lerp(0.86f, 1.36f, steering01) * Mathf.Lerp(0.92f, 1.12f, vehicle.steeringMultiplier - 0.82f);
+            tuning.steeringInputFallRate *= Mathf.Lerp(0.94f, 1.28f, steering01);
+            tuning.lowSpeedSteeringAssist *= Mathf.Lerp(0.84f, 1.22f, steering01);
+            tuning.highSpeedSteeringStability *= Mathf.Lerp(1.08f, 0.88f, steering01) * Mathf.Lerp(1.18f, 0.92f, vehicle.steeringMultiplier - 0.82f);
             tuning.finalDrive *= t.finalDrive;
             tuning.brakeTorque *= t.brakeBias;
             tuning.normalSideGrip *= vehicle.gripMultiplier * t.tireGrip * (profile.HasUpgrade("grip_tires_1") ? 1.12f : 1f);
             tuning.driftSideGrip *= t.driftGrip;
             tuning.handbrakeRearGrip *= vehicle.isBike ? Mathf.Lerp(0.72f, 1.08f, t.rearBrakeSlide) : Mathf.Lerp(0.88f, 1.06f, t.driftGrip);
+            float driftGrip01 = Mathf.InverseLerp(0.45f, 1.85f, t.driftGrip);
+            tuning.driftSustain *= Mathf.Lerp(1.24f, 0.86f, driftGrip01);
+            tuning.driftExitRecovery *= Mathf.Lerp(0.82f, 1.26f, driftGrip01) * Mathf.Lerp(0.94f, 1.16f, Mathf.InverseLerp(0.55f, 1.65f, t.suspension));
+            tuning.driftExitYawDamping *= Mathf.Lerp(0.92f, 1.24f, driftGrip01) * Mathf.Lerp(0.96f, 1.16f, Mathf.InverseLerp(0.55f, 1.65f, t.suspension));
+            tuning.driftExitHoldSeconds *= Mathf.Lerp(1.08f, 0.88f, driftGrip01);
+            tuning.driftLateralDamping *= Mathf.Lerp(0.86f, 1.2f, driftGrip01);
+            tuning.driftHandbrakeEntryKick *= Mathf.Lerp(1.16f, 0.92f, driftGrip01);
+            tuning.driftHandbrakeEntryDuration *= Mathf.Lerp(1.12f, 0.94f, driftGrip01);
             tuning.clutchTransferSharpness *= t.clutchBite * (profile.HasUpgrade("clutch_response_1") ? 1.18f : 1f);
             tuning.clutchKickSlipBoost *= Mathf.Lerp(0.82f, 1.28f, Mathf.InverseLerp(0.55f, 1.8f, t.clutchBite));
             tuning.boostTorqueMultiplier = 1f + (tuning.boostTorqueMultiplier - 1f) * vehicle.boostMultiplier * t.boostValve * (profile.HasUpgrade("boost_valve_1") ? 1.14f : 1f);
@@ -1129,6 +1147,48 @@ namespace GTX.Progression
                 tuning.boostTorqueMultiplier *= profile.HasUpgrade("boost_tuck_1") ? 1.08f : 1f;
                 tuning.centerOfMassOffset = new Vector3(0f, -0.66f, 0.08f);
                 tuning.handbrakeTorque *= 0.76f;
+            }
+
+            ApplyVehicleFeelIdentity(tuning, vehicle);
+        }
+
+        private static void ApplyVehicleFeelIdentity(VehicleTuning tuning, VectorSSVehicleDefinition vehicle)
+        {
+            switch (vehicle.id)
+            {
+                case VectorSSVehicleId.Hammer:
+                    tuning.highSpeedSteeringStability *= 1.28f;
+                    tuning.driftSustain *= 0.62f;
+                    tuning.driftExitRecovery *= 1.35f;
+                    tuning.driftExitYawDamping *= 1.28f;
+                    tuning.driftLateralDamping *= 1.16f;
+                    tuning.driftHandbrakeEntryKick *= 0.72f;
+                    break;
+                case VectorSSVehicleId.Needle:
+                    tuning.highSpeedSteeringStability *= 0.84f;
+                    tuning.driftSustain *= 1.08f;
+                    tuning.driftExitRecovery *= 0.92f;
+                    tuning.driftExitYawDamping *= 0.92f;
+                    tuning.driftHandbrakeEntryKick *= 1.08f;
+                    tuning.driftHandbrakeEntryDuration *= 1.05f;
+                    tuning.driftThrottleInfluence *= 1.08f;
+                    break;
+                case VectorSSVehicleId.Surge:
+                    tuning.highSpeedSteeringStability *= 1.36f;
+                    tuning.driftSustain *= 0.72f;
+                    tuning.driftExitYawDamping *= 1.18f;
+                    tuning.driftLateralDamping *= 1.18f;
+                    tuning.driftHandbrakeEntryKick *= 0.82f;
+                    break;
+                case VectorSSVehicleId.Razor:
+                    tuning.highSpeedSteeringStability *= 1.05f;
+                    tuning.driftSustain *= 0.84f;
+                    tuning.driftExitYawDamping *= 1.1f;
+                    tuning.driftLateralDamping *= 1.14f;
+                    tuning.driftHandbrakeEntryKick *= 1.08f;
+                    tuning.driftHandbrakeEntryDuration *= 0.9f;
+                    tuning.driftThrottleInfluence *= 0.82f;
+                    break;
             }
         }
 

@@ -1,3 +1,4 @@
+using GTX.Core;
 using GTX.Flow;
 using GTX.Visuals;
 using System;
@@ -64,7 +65,7 @@ namespace GTX.Combat
 
         private void Update()
         {
-            if (Input.GetKeyDown(guardKey))
+            if (Input.GetKeyDown(guardKey) || GTXInput.AxisNegativePressedDown("GTX_DPadY", 0.5f, 5))
             {
                 TrySpinGuard();
             }
