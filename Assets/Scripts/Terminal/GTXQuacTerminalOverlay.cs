@@ -341,7 +341,7 @@ namespace GTX.Terminal
             field.placeholder = placeholder;
             field.lineType = InputField.LineType.SingleLine;
             field.caretColor = Color.white;
-            field.selectionColor = new Color(0.1f, 0.75f, 1f, 0.42f);
+            field.selectionColor = new Color(0.13f, 0.36f, 0.48f, 0.42f);
             return field;
         }
 

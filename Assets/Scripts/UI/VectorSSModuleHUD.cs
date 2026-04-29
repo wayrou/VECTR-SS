@@ -21,13 +21,13 @@ namespace GTX.UI
         private static readonly Color BracketColor = new Color(0.16f, 0.17f, 0.17f, 1f);
         private static readonly Color ScrewColor = new Color(0.33f, 0.35f, 0.34f, 1f);
         private static readonly Color ScrewSlotColor = new Color(0.05f, 0.055f, 0.055f, 1f);
-        private static readonly Color TitleColor = new Color(0.62f, 0.72f, 0.7f, 1f);
-        private static readonly Color ValueColor = new Color(0.96f, 1f, 0.88f, 1f);
+        private static readonly Color TitleColor = new Color(0.58f, 0.61f, 0.56f, 1f);
+        private static readonly Color ValueColor = new Color(0.90f, 0.86f, 0.72f, 1f);
         private static readonly Color BarBackColor = new Color(0.035f, 0.039f, 0.04f, 1f);
         private static readonly Color BarDeadColor = new Color(0.09f, 0.1f, 0.098f, 0.96f);
-        private static readonly Color ReadyColor = new Color(0.12f, 0.95f, 0.56f, 1f);
-        private static readonly Color WarningColor = new Color(1f, 0.36f, 0.08f, 1f);
-        private static readonly Color CautionColor = new Color(1f, 0.75f, 0.12f, 1f);
+        private static readonly Color ReadyColor = new Color(0.42f, 0.50f, 0.24f, 1f);
+        private static readonly Color WarningColor = new Color(0.78f, 0.32f, 0.075f, 1f);
+        private static readonly Color CautionColor = new Color(0.82f, 0.56f, 0.16f, 1f);
         private static readonly Color LabelPlateColor = new Color(0.06f, 0.065f, 0.063f, 1f);
 
         [SerializeField] private Canvas targetCanvas;
@@ -178,7 +178,8 @@ namespace GTX.UI
 
             Image panelImage = panelObject.GetComponent<Image>();
             panelImage.color = PanelColor;
-            panelImage.raycastTarget = false;
+            panelImage.raycastTarget = true;
+            panelObject.AddComponent<VectorSSDraggableResizablePanel>().Configure(new Vector2(96f, 38f), true, 28f);
 
             RectTransform bezel = CreateImage("Black Bezel", panelRect, BezelColor);
             Stretch(bezel, 3f, 3f, -3f, -3f);
@@ -378,6 +379,23 @@ namespace GTX.UI
             widgetViews.Remove(moduleId);
         }
 
+        public bool TryReadWidgetLayout(string moduleId, out Vector2 position, out Vector2 size, out float scale)
+        {
+            position = Vector2.zero;
+            size = new Vector2(PanelWidth, PanelHeight);
+            scale = 1f;
+            WidgetView view;
+            if (string.IsNullOrEmpty(moduleId) || !widgetViews.TryGetValue(moduleId, out view) || view.root == null)
+            {
+                return false;
+            }
+
+            position = view.root.anchoredPosition;
+            size = view.root.sizeDelta;
+            scale = view.root.localScale.x;
+            return true;
+        }
+
         [System.Serializable]
         public sealed class ModuleWidgetState
         {
@@ -385,6 +403,7 @@ namespace GTX.UI
             public string title;
             public string value;
             public Vector2 position;
+            public Vector2 size = new Vector2(PanelWidth, PanelHeight);
             public float scale = 1f;
             public bool visible = true;
         }
@@ -417,6 +436,9 @@ namespace GTX.UI
                 if (root != null)
                 {
                     root.anchoredPosition = state.position;
+                    root.sizeDelta = new Vector2(
+                        Mathf.Max(96f, state.size.x <= 0.01f ? PanelWidth : state.size.x),
+                        Mathf.Max(38f, state.size.y <= 0.01f ? PanelHeight : state.size.y));
                     root.localScale = Vector3.one * Mathf.Max(0.01f, state.scale);
                     root.gameObject.SetActive(state.visible);
                 }
@@ -457,7 +479,7 @@ namespace GTX.UI
 
                     if (valueText != null)
                     {
-                        valueText.color = isWarning ? new Color(1f, 0.82f, 0.68f, 1f) : ValueColor;
+                        valueText.color = isWarning ? new Color(0.90f, 0.66f, 0.48f, 1f) : ValueColor;
                     }
 
                     if (barSegments != null)

@@ -7,12 +7,13 @@ namespace GTX.Combat
         [SerializeField] private Rigidbody body;
         [SerializeField] private float health = 100f;
         [SerializeField] private float wobbleSeconds = 0.35f;
-        [SerializeField] private Color normalColor = new Color(0.9f, 0.1f, 0.18f, 1f);
-        [SerializeField] private Color hitColor = new Color(1f, 0.9f, 0.25f, 1f);
+        [SerializeField] private Color normalColor = new Color(0.66f, 0.08f, 0.055f, 1f);
+        [SerializeField] private Color hitColor = new Color(0.82f, 0.56f, 0.16f, 1f);
 
         private Renderer cachedRenderer;
         private Material materialInstance;
         private float wobbleUntil;
+        private bool preserveRootRotation;
 
         public Transform TargetTransform => transform;
         public float Health => health;
@@ -29,11 +30,19 @@ namespace GTX.Combat
                 body = GetComponent<Rigidbody>();
             }
 
+            preserveRootRotation = GetComponent<GTX.Vehicle.SimpleRouteRivalAI>() != null;
             cachedRenderer = GetComponentInChildren<Renderer>();
             if (cachedRenderer != null)
             {
                 materialInstance = cachedRenderer.material;
-                materialInstance.color = normalColor;
+                if (preserveRootRotation)
+                {
+                    normalColor = materialInstance.color;
+                }
+                else
+                {
+                    materialInstance.color = normalColor;
+                }
             }
         }
 
@@ -41,12 +50,19 @@ namespace GTX.Combat
         {
             if (Time.time < wobbleUntil)
             {
-                float shake = Mathf.Sin(Time.time * 80f) * 2.5f;
-                transform.localRotation = Quaternion.Euler(0f, shake, 0f);
+                if (!preserveRootRotation)
+                {
+                    float shake = Mathf.Sin(Time.time * 80f) * 2.5f;
+                    transform.localRotation = Quaternion.Euler(0f, shake, 0f);
+                }
             }
             else
             {
-                transform.localRotation = Quaternion.Slerp(transform.localRotation, Quaternion.identity, Time.deltaTime * 12f);
+                if (!preserveRootRotation)
+                {
+                    transform.localRotation = Quaternion.Slerp(transform.localRotation, Quaternion.identity, Time.deltaTime * 12f);
+                }
+
                 if (materialInstance != null)
                 {
                     materialInstance.color = Color.Lerp(materialInstance.color, normalColor, Time.deltaTime * 10f);

@@ -4,12 +4,13 @@ Vector SS is the current title for the project previously referred to as GTX. So
 
 Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slice with this lightweight loop:
 
-`Main Menu -> Map Select -> Vehicle Select -> Race -> Results -> Garage -> Race Again`
+`Main Menu -> Start Game -> The Pitblock -> Race Board / Garage Nodes / Vehicle Bay -> Race or Test Drive -> Results -> The Pitblock`
 
 ## What Was Built
 
 - Unity/C# runtime bootstrap in `Assets/Scenes/GTXVerticalSlice.unity`.
 - Runtime menu flow for main menu, map select, vehicle select, garage, race HUD, and results.
+- Runtime-built `Pitblock_Hub` garage hub entered from Start Game, with on-foot movement, physical menu nodes, a vehicle bay, and a compact outside city test-drive area.
 - Three playable map variants:
   - Blackline Circuit: intro elevated highway/city circuit.
   - Scrapline Yard: wide industrial combat course with movable crates.
@@ -24,6 +25,7 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - Existing combat remains: side slam, boost ram, and spin guard.
 - Hidden Flow remains visual-first: speed lines, boost trail changes, skid ink, impact bursts, camera FOV, and outline pulse.
 - Metal, Plastic, and Rubber resource inventory.
+- Scrap Cubes as a race reward currency that convert into Metal, Plastic, or Rubber at the Scrap Counter.
 - Race rewards with completion, style/combat, and map bonus payouts.
 - Lightweight one-lap checkpoint objective with visible checkpoint gates and automatic finish through the start gate.
 - Simple route-following AI rival that drives the selected map while remaining a combat target.
@@ -34,6 +36,21 @@ Vector SS 0.1.0 is a playable low-art, cel-shaded 3D action racing vertical slic
 - Additive UGUI menu prototype in `Assets/Scripts/UI/VectorSSMenuUI.cs` for later replacement of the current immediate-mode menu.
 
 ## Controls
+
+### The Pitblock On Foot
+
+- `W` / `A` / `S` / `D`: move
+- `Left Shift`: sprint
+- `Space`: jump
+- `E`: interact
+
+### Pitblock Vehicle Bay / Test Drive
+
+- Approach the current vehicle and press `E` to enter.
+- Vehicle driving uses the same controller and physics as races.
+- Hold `Space` + `S` for 1.5 seconds to Pit Pop out of the vehicle and return to on-foot mode.
+
+### Race Vehicle
 
 - `W`: throttle
 - `S`: brake
@@ -87,6 +104,25 @@ Vector SS 0.1.0 has three resources:
 - Plastic: aero, boost, cooling, visual/lightweight panels.
 - Rubber: tires, grip, clutch, suspension, drift control.
 
+Race results also grant Scrap Cubes. The Pitblock Scrap Counter converts them at a simple 0.1.0 rate:
+
+- 1 Scrap Cube -> 10 Metal
+- 1 Scrap Cube -> 10 Plastic
+- 1 Scrap Cube -> 10 Rubber
+
+Scrap Cubes and all three resource counts persist through PlayerPrefs.
+
+## The Pitblock Nodes
+
+- Garage Terminal: opens the existing garage/customization menu.
+- Race Board: opens the existing race setup flow, `Select Race Track -> Select Car -> Customize Race Details -> Start Race`.
+- Module Bench: opens the existing Modules tab for module install/uninstall and HUD layout controls.
+- Paint Booth: opens a simple 0.1.0 paint/customization placeholder with palette swatches and saved outline thickness.
+- Scrap Counter: converts Scrap Cubes into Metal, Plastic, or Rubber.
+- Vehicle Bay: shows the current selected vehicle and lets the player enter it for outside test driving.
+
+The hub intentionally does not add dyno gameplay, drift pads, combat lots, hub challenges, emotes, city gates, race gates, or special hub-only driving physics.
+
 Free tuning sliders include steering, brake bias, drift grip, final drive, boost valve, suspension, tire grip, clutch bite, outline thickness, camera shake, and Razor bike tuning such as lean response and rear brake slide.
 
 Purchasable upgrades include:
@@ -115,7 +151,7 @@ Purchasable cockpit modules include:
 
 Each vehicle has limited module slots. The garage Modules section lets you buy, install, uninstall, and reposition installed module widgets with X/Y/scale sliders. Heat remains internal unless the Heat Gauge is installed.
 
-Resources, purchased upgrades/modules, installed modules, selected map, selected vehicle, tuning values, and module widget layouts persist with PlayerPrefs under the Vector SS 0.1.0 save prefix.
+Resources, Scrap Cubes, purchased upgrades/modules, installed modules, selected map, selected vehicle, tuning values, and module widget layouts persist with PlayerPrefs under the Vector SS 0.1.0 save prefix.
 
 ## How To Run
 
@@ -123,7 +159,7 @@ Resources, purchased upgrades/modules, installed modules, selected map, selected
 2. Open this folder as a Unity project.
 3. Open `Assets/Scenes/GTXVerticalSlice.unity`.
 4. Press Play.
-5. Use the Vector SS menu to select a map and vehicle, then start a race.
+5. Choose Start Game to load The Pitblock, then use the Race Board, Garage Terminal, Module Bench, Paint Booth, Scrap Counter, or Vehicle Bay.
 
 The scene is intentionally mostly empty. Runtime scripts build the menus, track, selected vehicle, camera, HUD, AI rival, materials, combat systems, rewards, and effects.
 
@@ -147,6 +183,8 @@ The scene is intentionally mostly empty. Runtime scripts build the menus, track,
 
 - Many internal identifiers still say GTX. The player-facing direction is Vector SS.
 - The current primary menu is immediate-mode GUI for speed of integration; the additive `VectorSSMenuUI` script is ready for a later UGUI swap.
+- The Pitblock is runtime-generated inside the current vertical-slice scene as `Pitblock_Hub Runtime Scene`; there is not yet an authored Unity scene/prefab version.
+- Pitblock chibi drivers, NPCs, signs, and props are prototype geometry/materials rather than final authored assets or animations.
 - Module HUD layout is slider-based rather than drag-and-drop; it proves persistence and customization but needs a richer editor.
 - Visual assets are still mostly runtime-generated geometry and UI; authored hand-drawn PNG icons/decals/posters are still needed.
 - Race completion now uses a lightweight checkpoint/lap state machine, but it still uses nearest-route projection rather than physical trigger volumes.

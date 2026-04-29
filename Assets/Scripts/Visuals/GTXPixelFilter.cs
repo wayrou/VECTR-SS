@@ -5,10 +5,9 @@ namespace GTX.Visuals
     [RequireComponent(typeof(Camera))]
     public sealed class GTXPixelFilter : MonoBehaviour
     {
-        [SerializeField] private int resolutionIndex = 1;
+        [SerializeField] private int resolutionIndex = 0;
         [SerializeField] private KeyCode toggleKey = KeyCode.F4;
         [SerializeField] private int[] verticalResolutionOptions = { 0, 360 };
-        [SerializeField] private bool showOptionLabel = true;
 
         public bool PixelFilterEnabled
         {
@@ -54,6 +53,12 @@ namespace GTX.Visuals
             }
         }
 
+        private void Awake()
+        {
+            EnsureOptions();
+            resolutionIndex = 0;
+        }
+
         private void Update()
         {
             if (Input.GetKeyDown(toggleKey))
@@ -83,21 +88,6 @@ namespace GTX.Visuals
             RenderTexture.ReleaseTemporary(lowResolution);
         }
 
-        private void OnGUI()
-        {
-            if (!showOptionLabel)
-            {
-                return;
-            }
-
-            EnsureOptions();
-            int clampedIndex = Mathf.Clamp(resolutionIndex, 0, verticalResolutionOptions.Length - 1);
-            int targetResolution = verticalResolutionOptions[clampedIndex];
-            string label = targetResolution > 0 ? "PIXEL " + clampedIndex + ": " + targetResolution + "p" : "PIXEL 0: OFF";
-            Rect rect = new Rect(Screen.width - 176f, 18f, 154f, 28f);
-            GUI.Box(rect, label);
-        }
-
         private int CurrentResolution
         {
             get
@@ -112,7 +102,7 @@ namespace GTX.Visuals
             if (verticalResolutionOptions == null || verticalResolutionOptions.Length == 0)
             {
                 verticalResolutionOptions = new[] { 0, 360 };
-                resolutionIndex = 1;
+                resolutionIndex = 0;
             }
         }
     }

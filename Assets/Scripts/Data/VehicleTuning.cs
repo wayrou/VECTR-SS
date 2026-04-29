@@ -63,6 +63,7 @@ namespace GTX.Data
         public float collisionRecoveryDuration = 0.85f;
         public float collisionRecoveryDriveForce = 10.5f;
         public float collisionRecoveryNudgeForce = 4.8f;
+        public bool bikeHandling;
 
         [Header("Drift")]
         public float driftSlipThreshold = 0.32f;

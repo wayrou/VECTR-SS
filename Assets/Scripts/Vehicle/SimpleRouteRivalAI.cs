@@ -14,7 +14,12 @@ namespace GTX.Vehicle
         [Header("Arcade Physics")]
         [SerializeField] private float acceleration = 18f;
         [SerializeField] private float braking = 24f;
+        [SerializeField] private float launchAssist = 28f;
+        [SerializeField] private float minimumLaunchSpeed = 7f;
+        [SerializeField] private float stuckVelocityThreshold = 0.65f;
+        [SerializeField] private float stuckAssistDelay = 0.18f;
         [SerializeField] private float maxSteerTorque = 16f;
+        [SerializeField] private float rotationDegreesPerSecond = 190f;
         [SerializeField] private float turnSlowdown = 0.42f;
         [SerializeField] private float sideSlipDamping = 4.5f;
         [SerializeField] private float downforce = 20f;
@@ -24,6 +29,24 @@ namespace GTX.Vehicle
         public int LapCount { get; private set; }
         public float Progress01 { get; private set; }
         public int CurrentTargetIndex { get; private set; }
+        public bool DrivingEnabled
+        {
+            get { return drivingEnabled; }
+            set
+            {
+                if (drivingEnabled == value)
+                {
+                    return;
+                }
+
+                drivingEnabled = value;
+                launchRampTimer = 0f;
+                if (drivingEnabled)
+                {
+                    currentSpeed = 0f;
+                }
+            }
+        }
 
         private Rigidbody body;
         private Vector3[] samples;
@@ -31,11 +54,17 @@ namespace GTX.Vehicle
         private float routeLength;
         private float cruiseSpeed;
         private float aggression;
+        private float laneOffset;
         private float currentRouteDistance;
+        private float currentSpeed;
+        private float stuckTimer;
+        private float routeDriveAssistTimer;
+        private float launchRampTimer;
+        private bool drivingEnabled = true;
         private bool configured;
         private bool suppressLapUpdate;
 
-        public void Configure(Vector3[] routeSamples, float newRouteLength, float startDistance, float newCruiseSpeed, float newAggression)
+        public void Configure(Vector3[] routeSamples, float newRouteLength, float startDistance, float newCruiseSpeed, float newAggression, float newLaneOffset = 0f)
         {
             body = GetComponent<Rigidbody>();
             configured = false;
@@ -64,6 +93,7 @@ namespace GTX.Vehicle
             routeLength = Mathf.Max(0.01f, routeLength);
             cruiseSpeed = Mathf.Max(0f, newCruiseSpeed);
             aggression = Mathf.Clamp01(newAggression);
+            laneOffset = newLaneOffset;
 
             LapCount = Mathf.Max(0, Mathf.FloorToInt(Mathf.Max(0f, startDistance) / routeLength));
             currentRouteDistance = Mathf.Repeat(startDistance, routeLength);
@@ -83,16 +113,32 @@ namespace GTX.Vehicle
             }
 
             RoutePose pose = PoseAtDistance(currentRouteDistance);
-            Vector3 position = pose.position + Vector3.up * routeHeightOffset;
-            Quaternion rotation = Quaternion.LookRotation(pose.forward, Vector3.up);
+            Vector3 position = pose.position + pose.right * laneOffset + Vector3.up * routeHeightOffset;
+            RoutePose aheadPose = PoseAtDistance(currentRouteDistance + Mathf.Max(6f, cornerLookAheadDistance));
+            Vector3 forward = aheadPose.position - pose.position;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f)
+            {
+                forward = pose.forward;
+            }
+
+            Quaternion rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
 
             body.position = position;
             body.rotation = rotation;
             body.velocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
+            body.isKinematic = true;
+            body.detectCollisions = true;
+            body.WakeUp();
             transform.SetPositionAndRotation(position, rotation);
 
+            currentSpeed = 0f;
+            stuckTimer = 0f;
+            routeDriveAssistTimer = 0f;
+            launchRampTimer = 0f;
             suppressLapUpdate = true;
+            DrivingEnabled = false;
         }
 
         private void Reset()
@@ -112,62 +158,168 @@ namespace GTX.Vehicle
                 return;
             }
 
-            float projectedDistance = DistanceAlongRoute(body.position);
-            UpdateProgress(projectedDistance);
+            if (!DrivingEnabled)
+            {
+                body.velocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                return;
+            }
 
-            float speed = body.velocity.magnitude;
-            float lookAhead = Mathf.Lerp(cornerLookAheadDistance, lookAheadDistance, Mathf.Clamp01(speed / Mathf.Max(1f, cruiseSpeed)));
+            ApplyRouteLockedDrive();
+        }
+
+        private void ApplyRouteLockedDrive()
+        {
+            float lookAhead = Mathf.Lerp(cornerLookAheadDistance, lookAheadDistance, Mathf.Clamp01(currentSpeed / Mathf.Max(1f, cruiseSpeed)));
             lookAhead *= Mathf.Lerp(0.85f, 1.25f, aggression);
 
             RoutePose currentPose = PoseAtDistance(currentRouteDistance);
+            RoutePose nearAheadPose = PoseAtDistance(currentRouteDistance + Mathf.Max(4f, cornerLookAheadDistance));
             RoutePose targetPose = PoseAtDistance(currentRouteDistance + lookAhead);
             CurrentTargetIndex = FindTargetSampleIndex(currentRouteDistance + lookAhead);
-            Vector3 toTarget = targetPose.position - body.position;
-            toTarget.y = 0f;
 
-            Vector3 desiredForward = toTarget.sqrMagnitude > 0.01f ? toTarget.normalized : targetPose.forward;
-            float steerAngle = Vector3.SignedAngle(FlatForward(transform.forward), desiredForward, Vector3.up);
-            float steer01 = Mathf.Clamp(steerAngle / 55f, -1f, 1f);
+            float steerAngle = Vector3.SignedAngle(currentPose.forward, targetPose.forward, Vector3.up);
+            float corner01 = Mathf.Clamp01(Mathf.Abs(steerAngle) / 78f);
+            float targetSpeed = cruiseSpeed * Mathf.Lerp(1f, turnSlowdown, corner01) * Mathf.Lerp(0.92f, 1.18f, aggression);
+            launchRampTimer += Time.fixedDeltaTime;
+            float launch01 = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(launchRampTimer / 2.4f));
+            targetSpeed *= Mathf.Lerp(0.28f, 1f, launch01);
+            float response = targetSpeed >= currentSpeed ? acceleration : braking;
+            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, response * Time.fixedDeltaTime);
+            currentSpeed = Mathf.Max(currentSpeed, Mathf.Min(minimumLaunchSpeed * launch01, targetSpeed));
 
-            float corner01 = Mathf.Clamp01(Mathf.Abs(steerAngle) / 70f);
-            float targetSpeed = cruiseSpeed * Mathf.Lerp(1f, turnSlowdown, corner01);
-            targetSpeed *= Mathf.Lerp(0.92f, 1.18f, aggression);
+            float previousDistance = currentRouteDistance;
+            currentRouteDistance = Mathf.Repeat(currentRouteDistance + currentSpeed * Time.fixedDeltaTime, routeLength);
+            if (!suppressLapUpdate && currentRouteDistance < previousDistance - routeLength * 0.5f)
+            {
+                LapCount++;
+            }
 
-            ApplyDriveForces(currentPose, desiredForward, targetSpeed);
-            ApplySteering(steer01);
-            ApplyStability();
+            suppressLapUpdate = false;
+            DistanceTravelled = Mathf.Max(0f, LapCount * routeLength + currentRouteDistance);
+            Progress01 = currentRouteDistance / routeLength;
+
+            RoutePose nextPose = PoseAtDistance(currentRouteDistance);
+            Vector3 nextPosition = nextPose.position + nextPose.right * laneOffset + Vector3.up * routeHeightOffset;
+            Vector3 desiredForward = nearAheadPose.position - currentPose.position;
+            desiredForward.y = 0f;
+            if (desiredForward.sqrMagnitude < 0.001f)
+            {
+                desiredForward = nextPose.forward;
+            }
+
+            Quaternion targetRotation = Quaternion.LookRotation(desiredForward.normalized, Vector3.up);
+            float speed01 = Mathf.Clamp01(currentSpeed / Mathf.Max(1f, cruiseSpeed));
+            float rotationRate = rotationDegreesPerSecond * Mathf.Lerp(0.8f, 1.35f, aggression) * Mathf.Lerp(1.2f, 0.85f, speed01);
+            Quaternion nextRotation = Quaternion.RotateTowards(body.rotation, targetRotation, rotationRate * Time.fixedDeltaTime);
+
+            body.MovePosition(nextPosition);
+            body.MoveRotation(nextRotation);
+            transform.SetPositionAndRotation(nextPosition, nextRotation);
+            body.velocity = desiredForward.normalized * currentSpeed;
+            body.angularVelocity = Vector3.zero;
         }
 
-        private void ApplyDriveForces(RoutePose currentPose, Vector3 desiredForward, float targetSpeed)
+        private void ApplyDriveForces(RoutePose currentPose, Vector3 currentLanePosition, Vector3 desiredForward, float targetSpeed)
         {
             Vector3 flatVelocity = body.velocity;
             flatVelocity.y = 0f;
 
             float forwardSpeed = Vector3.Dot(flatVelocity, desiredForward);
             float speedError = targetSpeed - forwardSpeed;
-            float force = speedError >= 0f ? acceleration : braking;
-            body.AddForce(desiredForward * Mathf.Clamp(speedError, -1f, 1f) * force, ForceMode.Acceleration);
+            float response = speedError >= 0f ? acceleration : braking;
+            if (targetSpeed > 1f && flatVelocity.magnitude < 1.2f)
+            {
+                body.AddForce(FlatForward(transform.forward) * launchAssist, ForceMode.Acceleration);
+            }
 
-            Vector3 lateralOffset = body.position - currentPose.position;
+            Vector3 lateralOffset = body.position - currentLanePosition;
             lateralOffset.y = 0f;
             float lateralError = Vector3.Dot(lateralOffset, currentPose.right);
-            Vector3 correction = -currentPose.right * lateralError * lateralCorrection;
-            body.AddForce(correction, ForceMode.Acceleration);
+            Vector3 correctionVelocity = -currentPose.right * lateralError * lateralCorrection;
+            Vector3 targetVelocity = desiredForward * targetSpeed + Vector3.ClampMagnitude(correctionVelocity, 5.5f);
+            Vector3 nextFlatVelocity = Vector3.MoveTowards(flatVelocity, targetVelocity, response * Time.fixedDeltaTime);
 
             Vector3 right = transform.right;
             right.y = 0f;
             if (right.sqrMagnitude > 0.001f)
             {
                 right.Normalize();
-                body.AddForce(-right * Vector3.Dot(flatVelocity, right) * sideSlipDamping, ForceMode.Acceleration);
+                nextFlatVelocity -= right * Vector3.Dot(nextFlatVelocity, right) * Mathf.Clamp01(sideSlipDamping * Time.fixedDeltaTime);
             }
+
+            body.velocity = new Vector3(nextFlatVelocity.x, body.velocity.y, nextFlatVelocity.z);
         }
 
-        private void ApplySteering(float steer01)
+        private void ApplyStuckLaunchAssist(Vector3 desiredForward, float targetSpeed)
+        {
+            Vector3 flatVelocity = body.velocity;
+            flatVelocity.y = 0f;
+            if (targetSpeed <= 1f || flatVelocity.magnitude > stuckVelocityThreshold)
+            {
+                stuckTimer = 0f;
+                return;
+            }
+
+            stuckTimer += Time.fixedDeltaTime;
+            if (stuckTimer < stuckAssistDelay)
+            {
+                return;
+            }
+
+            Vector3 launchVelocity = desiredForward * Mathf.Min(minimumLaunchSpeed, targetSpeed);
+            launchVelocity.y = body.velocity.y;
+            body.velocity = launchVelocity;
+            body.angularVelocity = Vector3.zero;
+            body.WakeUp();
+        }
+
+        private void ApplyRouteDriveAssist(RoutePose currentPose, RoutePose targetPose, float targetSpeed)
+        {
+            Vector3 flatVelocity = body.velocity;
+            flatVelocity.y = 0f;
+            if (targetSpeed <= 1f || flatVelocity.magnitude > 1.5f)
+            {
+                routeDriveAssistTimer = 0f;
+                return;
+            }
+
+            routeDriveAssistTimer += Time.fixedDeltaTime;
+            if (routeDriveAssistTimer < 0.35f)
+            {
+                return;
+            }
+
+            currentRouteDistance = Mathf.Repeat(currentRouteDistance + Mathf.Max(minimumLaunchSpeed, targetSpeed * 0.45f) * Time.fixedDeltaTime, routeLength);
+            RoutePose pose = PoseAtDistance(currentRouteDistance);
+            Vector3 nextPosition = pose.position + pose.right * laneOffset + Vector3.up * routeHeightOffset;
+            Vector3 nextForward = targetPose.position - currentPose.position;
+            nextForward.y = 0f;
+            if (nextForward.sqrMagnitude < 0.001f)
+            {
+                nextForward = pose.forward;
+            }
+
+            body.MovePosition(nextPosition);
+            body.MoveRotation(Quaternion.LookRotation(nextForward.normalized, Vector3.up));
+            body.velocity = nextForward.normalized * Mathf.Min(targetSpeed, minimumLaunchSpeed);
+            body.angularVelocity = Vector3.zero;
+            body.WakeUp();
+        }
+
+        private void ApplySteering(Vector3 desiredForward, float steer01)
         {
             float speed01 = Mathf.Clamp01(body.velocity.magnitude / Mathf.Max(1f, cruiseSpeed));
+            if (desiredForward.sqrMagnitude > 0.001f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(desiredForward, Vector3.up);
+                float rotationRate = rotationDegreesPerSecond * Mathf.Lerp(0.68f, 1.25f, aggression) * Mathf.Lerp(1.15f, 0.72f, speed01);
+                body.MoveRotation(Quaternion.RotateTowards(body.rotation, targetRotation, rotationRate * Time.fixedDeltaTime));
+                transform.rotation = body.rotation;
+            }
+
             float yawDamping = body.angularVelocity.y * Mathf.Lerp(2.5f, 5f, speed01);
-            body.AddTorque(Vector3.up * ((steer01 * maxSteerTorque) - yawDamping), ForceMode.Acceleration);
+            body.AddTorque(Vector3.up * ((steer01 * maxSteerTorque * 0.22f) - yawDamping), ForceMode.Acceleration);
         }
 
         private void ApplyStability()

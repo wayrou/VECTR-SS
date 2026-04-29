@@ -114,19 +114,33 @@ namespace GTX.Visuals
             SmokePuff puff = puffs[nextPuffIndex];
             nextPuffIndex = (nextPuffIndex + 1) % puffs.Length;
 
-            Vector3 worldPosition = transform.TransformPoint(localEmitterPosition + new Vector3(0f, -0.28f, -0.22f));
-            Vector3 rearward = -transform.forward;
-            Vector3 sideways = transform.right * Random.Range(-0.42f, 0.42f);
-            Vector3 upward = Vector3.up * Random.Range(0.18f, 0.58f);
-            Vector3 bodyCarry = body != null ? body.velocity * 0.08f : Vector3.zero;
+            float sideSign = Mathf.Abs(localEmitterPosition.x) > 0.05f ? Mathf.Sign(localEmitterPosition.x) : (nextPuffIndex % 2 == 0 ? 1f : -1f);
+            Vector3 sideOffset = Vector3.right * sideSign * 0.48f;
+            Vector3 worldPosition = transform.TransformPoint(localEmitterPosition + sideOffset + new Vector3(0f, -0.38f, 0.2f));
+            Vector3 cameraDrift = -transform.forward;
+            if (Camera.main != null)
+            {
+                cameraDrift = Camera.main.transform.position - worldPosition;
+                cameraDrift.y = 0f;
+                if (cameraDrift.sqrMagnitude < 0.001f)
+                {
+                    cameraDrift = -transform.forward;
+                }
+            }
+
+            cameraDrift.Normalize();
+            Vector3 outward = transform.right * sideSign;
+            Vector3 sideways = outward * Random.Range(0.95f, 1.65f) + transform.right * Random.Range(-0.1f, 0.1f);
+            Vector3 upward = Vector3.up * Random.Range(0.08f, 0.32f);
+            Vector3 bodyCarry = body != null ? body.velocity * 0.02f : Vector3.zero;
 
             puff.age = 0f;
-            puff.lifetime = Random.Range(0.55f, 1.05f);
-            puff.startSize = Random.Range(0.34f, 0.58f) * Mathf.Lerp(0.8f, 1.45f, intensity);
-            puff.endSize = puff.startSize * Random.Range(2.5f, 4.1f);
-            puff.velocity = rearward * Random.Range(1.8f, 3.4f) * Mathf.Lerp(0.65f, 1.25f, intensity) + sideways + upward + bodyCarry;
+            puff.lifetime = Random.Range(0.5f, 0.9f);
+            puff.startSize = Random.Range(0.12f, 0.22f) * Mathf.Lerp(0.75f, 1.18f, intensity);
+            puff.endSize = puff.startSize * Random.Range(3.0f, 4.8f);
+            puff.velocity = cameraDrift * Random.Range(1.0f, 2.1f) + sideways + upward + bodyCarry;
             puff.spin = Random.Range(-90f, 90f);
-            puff.startColor = Color.Lerp(new Color(0.68f, 0.62f, 0.48f, 0.5f), new Color(0.22f, 0.23f, 0.22f, 0.38f), intensity);
+            puff.startColor = Color.Lerp(new Color(0.68f, 0.62f, 0.48f, 0.22f), new Color(0.22f, 0.23f, 0.22f, 0.16f), intensity);
             puff.transform.position = worldPosition;
             puff.transform.rotation = Quaternion.LookRotation(Camera.main != null ? Camera.main.transform.forward : transform.forward, Vector3.up);
             puff.transform.localScale = Vector3.one * puff.startSize;

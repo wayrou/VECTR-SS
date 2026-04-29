@@ -33,6 +33,9 @@ namespace GTX.UI
         private Text rpmText;
         private Text boostText;
         private Text heatText;
+        private TachometerGraphic tachometer;
+        private RectTransform tachNeedle;
+        private RectTransform hudContentRoot;
         private Text feedbackText;
         private Text controlsText;
         private Text flowText;
@@ -41,14 +44,13 @@ namespace GTX.UI
         private GameObject flowPanel;
         private GameObject garagePanel;
         private readonly List<string> moduleControlHints = new List<string>();
-        private Slider rpmSlider;
         private Slider boostSlider;
-        private Slider heatSlider;
         private Slider flowSlider;
         private GTXTelemetrySnapshot demoTelemetry;
         private float calloutTimer;
         private string currentCallout = "Ready";
         private const string TuningPrefsPrefix = "GTX.RuntimeTuning.";
+        private const float DefaultHudWindowScale = 2f;
         private static readonly string[] TuningFields = { "acceleration", "topSpeed", "grip", "steeringResponse", "brakePower", "boostPower", "cooling" };
 
         public event Action<GTXTuningProfile> TuningChanged;
@@ -114,10 +116,6 @@ namespace GTX.UI
                 heatText.gameObject.SetActive(visible);
             }
 
-            if (heatSlider != null)
-            {
-                heatSlider.gameObject.SetActive(visible);
-            }
         }
 
         public void SetModuleControlHints(IEnumerable<string> hints)
@@ -305,16 +303,47 @@ namespace GTX.UI
 
         private void UpdateHud(GTXTelemetrySnapshot snapshot)
         {
-            speedText.text = Mathf.RoundToInt(snapshot.speedKph * 0.621371f).ToString("000");
-            gearText.text = FormatGear(snapshot.gear);
-            rpmText.text = Mathf.RoundToInt(snapshot.rpm).ToString("0") + " RPM";
-            boostText.text = "BOOST " + Mathf.RoundToInt(snapshot.boost01 * 100f) + "%";
-            heatText.text = "HEAT " + Mathf.RoundToInt(snapshot.heat01 * 100f) + "%";
-            rpmSlider.value = snapshot.rpm01;
-            boostSlider.value = snapshot.boost01;
-            heatSlider.value = snapshot.heat01;
-            flowSlider.value = snapshot.flow01;
-            flowText.text = "FLOW " + Mathf.RoundToInt(snapshot.flow01 * 100f) + "%";
+            speedText.text = Mathf.RoundToInt(snapshot.speedKph * 0.621371f).ToString("000") + " MPH";
+            gearText.text = FormatGearNumber(snapshot.gear);
+            if (rpmText != null)
+            {
+                rpmText.text = Mathf.RoundToInt(snapshot.rpm).ToString("0") + " RPM";
+            }
+
+            if (boostText != null)
+            {
+                boostText.text = "BOOST " + Mathf.RoundToInt(snapshot.boost01 * 100f) + "%";
+            }
+
+            if (heatText != null)
+            {
+                heatText.text = "HEAT " + Mathf.RoundToInt(snapshot.heat01 * 100f) + "%";
+            }
+
+            if (tachometer != null)
+            {
+                tachometer.Rpm01 = snapshot.rpm01;
+            }
+
+            if (tachNeedle != null)
+            {
+                tachNeedle.localEulerAngles = new Vector3(0f, 0f, Mathf.Lerp(224f, -44f, Mathf.Clamp01(snapshot.rpm01)));
+            }
+
+            if (boostSlider != null)
+            {
+                boostSlider.value = snapshot.boost01;
+            }
+
+            if (flowSlider != null)
+            {
+                flowSlider.value = snapshot.flow01;
+            }
+
+            if (flowText != null)
+            {
+                flowText.text = "FLOW " + Mathf.RoundToInt(snapshot.flow01 * 100f) + "%";
+            }
 
             if (calloutTimer <= 0f && !string.IsNullOrEmpty(snapshot.feedback) && snapshot.feedback != currentCallout)
             {
@@ -371,6 +400,21 @@ namespace GTX.UI
             return "G" + gear;
         }
 
+        private static string FormatGearNumber(int gear)
+        {
+            if (gear < 0)
+            {
+                return "R";
+            }
+
+            if (gear == 0)
+            {
+                return "N";
+            }
+
+            return gear.ToString("0");
+        }
+
         private static bool ShouldPinFeedback(string feedback)
         {
             return feedback != "READY" && feedback != "Ready" && feedback != "Clean line";
@@ -391,28 +435,39 @@ namespace GTX.UI
             ConfigureCanvasScaler(canvas);
 
             RectTransform root = canvas.GetComponent<RectTransform>();
-            hudPanel = Panel("HUD", root, Anchor.BottomLeft, new Vector2(36f, 36f), new Vector2(356f, 188f), VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.88f));
-            speedText = Label("Speed", hudPanel.transform, "000", 66, TextAnchor.MiddleLeft, new Vector2(20f, 98f), new Vector2(170f, 72f));
-            Label("SpeedUnit", hudPanel.transform, "MPH", 15, TextAnchor.MiddleLeft, new Vector2(194f, 132f), new Vector2(72f, 22f));
-            gearText = Label("Gear", hudPanel.transform, "G1", 38, TextAnchor.MiddleCenter, new Vector2(270f, 102f), new Vector2(62f, 56f));
-            rpmText = Label("RPM", hudPanel.transform, "900 RPM", 16, TextAnchor.MiddleLeft, new Vector2(20f, 72f), new Vector2(132f, 22f));
-            rpmSlider = Meter("RPM Meter", hudPanel.transform, new Vector2(154f, 78f), new Vector2(178f, 10f), VectrStyleTokens.SafetyOrange);
-            boostText = Label("Boost", hudPanel.transform, "BOOST 0%", 14, TextAnchor.MiddleLeft, new Vector2(20f, 44f), new Vector2(94f, 20f));
-            boostSlider = Meter("Boost Meter", hudPanel.transform, new Vector2(116f, 50f), new Vector2(216f, 8f), VectrStyleTokens.ElectricCyan);
-            heatText = Label("Heat", hudPanel.transform, "HEAT 0%", 14, TextAnchor.MiddleLeft, new Vector2(20f, 20f), new Vector2(94f, 20f));
-            heatSlider = Meter("Heat Meter", hudPanel.transform, new Vector2(116f, 26f), new Vector2(216f, 8f), VectrStyleTokens.SignalRed);
+            hudPanel = Panel("HUD", root, Anchor.BottomLeft, new Vector2(24f, 124f), new Vector2(332f, 136f), VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.88f));
+            ApplyDefaultHudWindowScale(hudPanel);
+            hudContentRoot = ScaledContentRoot("HUD Dial Content", hudPanel.transform, new Vector2(332f, 136f));
+            tachometer = CreateTachometer(hudContentRoot, new Vector2(10f, 10f), new Vector2(124f, 116f));
+            tachNeedle = CreateTachNeedle(hudContentRoot, new Vector2(72f, 58f), new Vector2(5f, 54f));
+            LabelPlain("Tach 0", hudContentRoot, "0", 13, TextAnchor.MiddleCenter, new Vector2(55f, 12f), new Vector2(20f, 18f));
+            LabelPlain("Tach 4", hudContentRoot, "4", 13, TextAnchor.MiddleCenter, new Vector2(19f, 42f), new Vector2(20f, 18f));
+            LabelPlain("Tach 5", hudContentRoot, "5", 13, TextAnchor.MiddleCenter, new Vector2(23f, 73f), new Vector2(20f, 18f));
+            LabelPlain("Tach 6", hudContentRoot, "6", 13, TextAnchor.MiddleCenter, new Vector2(47f, 96f), new Vector2(20f, 18f));
+            LabelPlain("Tach 7", hudContentRoot, "7", 13, TextAnchor.MiddleCenter, new Vector2(78f, 96f), new Vector2(20f, 18f));
+            LabelPlain("Tach 8", hudContentRoot, "8", 13, TextAnchor.MiddleCenter, new Vector2(103f, 73f), new Vector2(20f, 18f));
+            LabelPlain("Tach 9", hudContentRoot, "9", 13, TextAnchor.MiddleCenter, new Vector2(107f, 42f), new Vector2(20f, 18f));
+            rpmText = LabelPlain("RPM", hudContentRoot, "900 RPM", 10, TextAnchor.MiddleCenter, new Vector2(42f, 31f), new Vector2(62f, 18f));
+            gearText = LabelPlain("Gear", hudContentRoot, "1", 52, TextAnchor.MiddleCenter, new Vector2(142f, 50f), new Vector2(64f, 62f));
+            LabelPlain("Shift Label", hudContentRoot, "SHIFT", 12, TextAnchor.MiddleCenter, new Vector2(146f, 35f), new Vector2(56f, 16f));
+            speedText = LabelPlain("Speed", hudContentRoot, "000 MPH", 31, TextAnchor.MiddleLeft, new Vector2(213f, 50f), new Vector2(106f, 48f));
+            boostText = LabelPlain("Boost", hudContentRoot, "BOOST 0%", 10, TextAnchor.MiddleLeft, new Vector2(214f, 24f), new Vector2(78f, 16f));
+            boostSlider = Meter("Boost Meter", hudContentRoot, new Vector2(214f, 18f), new Vector2(92f, 5f), VectrStyleTokens.SafetyOrange);
+            heatText = LabelPlain("Heat", hudContentRoot, "HEAT 0%", 10, TextAnchor.MiddleLeft, new Vector2(214f, 8f), new Vector2(78f, 16f));
 
             feedbackText = Label("Feedback", root, "Ready", 28, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(280f, 46f));
             SetAnchor(feedbackText.rectTransform, Anchor.TopCenter, new Vector2(0f, -76f), new Vector2(280f, 46f));
 
             controlsPanel = Panel("Controls Overlay", root, Anchor.TopLeft, new Vector2(24f, -24f), new Vector2(330f, 104f), VectrStyleTokens.WithAlpha(VectrStyleTokens.AsphaltNavy, 0.72f));
+            ApplyDefaultHudWindowScale(controlsPanel);
             Label("Controls Title", controlsPanel.transform, "CONTROLS", 12, TextAnchor.MiddleLeft, new Vector2(12f, 78f), new Vector2(86f, 18f));
             controlsText = Label("Controls Text", controlsPanel.transform, string.Empty, 9, TextAnchor.MiddleLeft, new Vector2(12f, 3f), new Vector2(306f, 76f));
             RefreshControlsText();
 
             flowPanel = Panel("Debug Flow", root, Anchor.TopRight, new Vector2(-32f, -32f), new Vector2(224f, 72f), VectrStyleTokens.WithAlpha(VectrStyleTokens.DeepViolet, 0.78f));
+            ApplyDefaultHudWindowScale(flowPanel);
             flowText = Label("Flow Text", flowPanel.transform, "FLOW 0%", 15, TextAnchor.MiddleLeft, new Vector2(16f, 38f), new Vector2(92f, 20f));
-            flowSlider = Meter("Flow Meter", flowPanel.transform, new Vector2(16f, 24f), new Vector2(192f, 8f), VectrStyleTokens.HotMagenta);
+            flowSlider = Meter("Flow Meter", flowPanel.transform, new Vector2(16f, 24f), new Vector2(192f, 8f), VectrStyleTokens.HotMagenta, true);
             flowPanel.SetActive(false);
 
             BuildGarage(root);
@@ -429,7 +484,7 @@ namespace GTX.UI
                 "W/S or R2/L2 throttle/brake   A/D steer\n" +
                 "Arrows camera   Q/E gears\n" +
                 "Hold Q reverse   Shift clutch   Space drift\n" +
-                "F / Circle boost   X drift   Z/C slam   N guard   R reset\n" +
+                "F / Circle boost   X drift   Triangle jump   Z/C slam   N guard   R reset\n" +
                 "Tab garage   F4 pixels   F5 camera   ` QUAC   F3 flow   F1 hide";
 
             if (moduleControlHints.Count > 0)
@@ -456,6 +511,7 @@ namespace GTX.UI
         private void BuildGarage(RectTransform root)
         {
             garagePanel = Panel("Garage Tuning", root, Anchor.MiddleRight, new Vector2(-34f, 0f), new Vector2(324f, 438f), VectrStyleTokens.WithAlpha(VectrStyleTokens.OilGray, 0.96f));
+            ApplyDefaultHudWindowScale(garagePanel);
             Label("Garage Title", garagePanel.transform, "DASH BAY", 24, TextAnchor.MiddleLeft, new Vector2(18f, 392f), new Vector2(150f, 30f));
 
             AddPresetButton("Strike", GTXTuningPreset.Strike, new Vector2(18f, 348f));
@@ -481,7 +537,7 @@ namespace GTX.UI
         private void AddTuningSlider(string label, string fieldName, float y)
         {
             Label(label + " Label", garagePanel.transform, label, 14, TextAnchor.MiddleLeft, new Vector2(18f, y), new Vector2(110f, 20f));
-            Slider slider = Meter(label + " Slider", garagePanel.transform, new Vector2(132f, y + 6f), new Vector2(138f, 8f), new Color(0.08f, 0.78f, 1f, 1f));
+            Slider slider = Meter(label + " Slider", garagePanel.transform, new Vector2(132f, y + 6f), new Vector2(138f, 8f), VectrStyleTokens.ElectricCyan);
             slider.minValue = 0.4f;
             slider.maxValue = 1.8f;
             FieldInfo field = typeof(GTXTuningProfile).GetField(fieldName);
@@ -674,6 +730,64 @@ namespace GTX.UI
             return null;
         }
 
+        private static RectTransform ScaledContentRoot(string name, Transform parent, Vector2 designSize)
+        {
+            GameObject gameObject = new GameObject(name);
+            gameObject.transform.SetParent(parent, false);
+            RectTransform rect = gameObject.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = designSize;
+            gameObject.AddComponent<VectorSSPanelContentScaler>().Configure(designSize);
+            return rect;
+        }
+
+        private TachometerGraphic CreateTachometer(Transform parent, Vector2 position, Vector2 dimensions)
+        {
+            GameObject gameObject = new GameObject("RPM Dial");
+            gameObject.transform.SetParent(parent, false);
+            TachometerGraphic graphic = gameObject.AddComponent<TachometerGraphic>();
+            graphic.raycastTarget = false;
+            RectTransform rect = graphic.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = dimensions;
+            return graphic;
+        }
+
+        private RectTransform CreateTachNeedle(Transform parent, Vector2 pivotPosition, Vector2 dimensions)
+        {
+            GameObject gameObject = new GameObject("RPM Needle");
+            gameObject.transform.SetParent(parent, false);
+            Image image = gameObject.AddComponent<Image>();
+            image.color = VectrStyleTokens.SignalRed;
+            image.raycastTarget = false;
+            RectTransform rect = image.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = pivotPosition;
+            rect.sizeDelta = dimensions;
+            return rect;
+        }
+
+        private Text LabelPlain(string name, Transform parent, string text, int size, TextAnchor anchor, Vector2 position, Vector2 dimensions)
+        {
+            Text label = Label(name, parent, text, size, anchor, position, dimensions);
+            VectorSSDraggableResizablePanel drag = label.GetComponent<VectorSSDraggableResizablePanel>();
+            if (drag != null)
+            {
+                Destroy(drag);
+            }
+
+            label.raycastTarget = false;
+            return label;
+        }
+
         private Text Label(string name, Transform parent, string text, int size, TextAnchor anchor, Vector2 position, Vector2 dimensions)
         {
             GameObject gameObject = new GameObject(name);
@@ -688,12 +802,14 @@ namespace GTX.UI
             label.fontSize = size;
             label.alignment = anchor;
             label.color = VectrStyleTokens.BoneWhite;
+            label.raycastTarget = true;
             RectTransform rect = label.rectTransform;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.zero;
             rect.pivot = Vector2.zero;
             rect.anchoredPosition = position;
             rect.sizeDelta = dimensions;
+            gameObject.AddComponent<VectorSSDraggableResizablePanel>().Configure(new Vector2(Mathf.Min(44f, dimensions.x), Mathf.Min(18f, dimensions.y)), true, 14f);
             return label;
         }
 
@@ -727,7 +843,7 @@ namespace GTX.UI
             return button;
         }
 
-        private Slider Meter(string name, Transform parent, Vector2 position, Vector2 dimensions, Color fillColor)
+        private Slider Meter(string name, Transform parent, Vector2 position, Vector2 dimensions, Color fillColor, bool draggable = false)
         {
             GameObject root = new GameObject(name);
             root.transform.SetParent(parent, false);
@@ -758,6 +874,10 @@ namespace GTX.UI
             slider.minValue = 0f;
             slider.maxValue = 1f;
             slider.value = 0f;
+            if (draggable)
+            {
+                root.AddComponent<VectorSSDraggableResizablePanel>().Configure(new Vector2(Mathf.Min(48f, dimensions.x), Mathf.Min(8f, dimensions.y)), true, 12f);
+            }
             return slider;
         }
 
@@ -770,7 +890,16 @@ namespace GTX.UI
             RectTransform rect = gameObject.GetComponent<RectTransform>();
             SetAnchor(rect, anchor, position, dimensions);
             AddHardwareFrame(rect);
+            gameObject.AddComponent<VectorSSDraggableResizablePanel>().Configure(new Vector2(Mathf.Min(160f, dimensions.x), Mathf.Min(72f, dimensions.y)), true, 24f);
             return gameObject;
+        }
+
+        private static void ApplyDefaultHudWindowScale(GameObject panel)
+        {
+            if (panel != null)
+            {
+                panel.transform.localScale = Vector3.one * DefaultHudWindowScale;
+            }
         }
 
         private static void AddHardwareFrame(RectTransform panel)
@@ -857,6 +986,126 @@ namespace GTX.UI
             TopRight,
             TopCenter,
             MiddleRight
+        }
+
+        private sealed class TachometerGraphic : Graphic
+        {
+            private float rpm01;
+
+            public float Rpm01
+            {
+                get { return rpm01; }
+                set
+                {
+                    float clamped = Mathf.Clamp01(value);
+                    if (!Mathf.Approximately(rpm01, clamped))
+                    {
+                        rpm01 = clamped;
+                        SetVerticesDirty();
+                    }
+                }
+            }
+
+            protected override void OnPopulateMesh(VertexHelper vh)
+            {
+                vh.Clear();
+
+                Rect r = rectTransform.rect;
+                Vector2 center = new Vector2(r.xMin + r.width * 0.5f, r.yMin + r.height * 0.42f);
+                float radius = Mathf.Min(r.width, r.height) * 0.45f;
+                const float start = 224f;
+                const float end = -44f;
+
+                AddArc(vh, center, radius, 5f, start, end, 36, VectrStyleTokens.BoneWhite);
+                AddArc(vh, center, radius + 1f, 7f, 18f, -42f, 10, VectrStyleTokens.SafetyOrange);
+                AddArc(vh, center, radius - 10f, 2f, start, end, 28, VectrStyleTokens.WithAlpha(VectrStyleTokens.WarmConcreteGray, 0.72f));
+
+                for (int i = 0; i <= 9; i++)
+                {
+                    float t = i / 9f;
+                    float angle = Mathf.Lerp(start, end, t);
+                    float length = i >= 7 ? 13f : 9f;
+                    float width = i >= 7 ? 3.2f : 2.2f;
+                    Vector2 outer = center + Direction(angle) * (radius + 2f);
+                    Vector2 inner = center + Direction(angle) * (radius - length);
+                    AddLine(vh, inner, outer, width, VectrStyleTokens.BoneWhite);
+                }
+
+                AddDisc(vh, center, 7f, VectrStyleTokens.InkBlack, 14);
+                AddDisc(vh, center, 4f, VectrStyleTokens.BoneWhite, 12);
+            }
+
+            private static void AddArc(VertexHelper vh, Vector2 center, float radius, float thickness, float startDeg, float endDeg, int segments, Color color)
+            {
+                Vector2 previousOuter = center + Direction(startDeg) * radius;
+                Vector2 previousInner = center + Direction(startDeg) * (radius - thickness);
+                for (int i = 1; i <= segments; i++)
+                {
+                    float t = i / (float)segments;
+                    float angle = Mathf.Lerp(startDeg, endDeg, t);
+                    Vector2 outer = center + Direction(angle) * radius;
+                    Vector2 inner = center + Direction(angle) * (radius - thickness);
+                    AddQuad(vh, previousInner, previousOuter, outer, inner, color);
+                    previousOuter = outer;
+                    previousInner = inner;
+                }
+            }
+
+            private static void AddDisc(VertexHelper vh, Vector2 center, float radius, Color color, int segments)
+            {
+                for (int i = 0; i < segments; i++)
+                {
+                    float a0 = 360f * i / segments;
+                    float a1 = 360f * (i + 1) / segments;
+                    AddTriangle(vh, center, center + Direction(a0) * radius, center + Direction(a1) * radius, color);
+                }
+            }
+
+            private static void AddLine(VertexHelper vh, Vector2 a, Vector2 b, float width, Color color)
+            {
+                Vector2 delta = b - a;
+                if (delta.sqrMagnitude < 0.001f)
+                {
+                    return;
+                }
+
+                Vector2 normal = new Vector2(-delta.y, delta.x).normalized * (width * 0.5f);
+                AddQuad(vh, a - normal, a + normal, b + normal, b - normal, color);
+            }
+
+            private static void AddQuad(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color color)
+            {
+                int startIndex = vh.currentVertCount;
+                AddVertex(vh, a, color);
+                AddVertex(vh, b, color);
+                AddVertex(vh, c, color);
+                AddVertex(vh, d, color);
+                vh.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
+                vh.AddTriangle(startIndex, startIndex + 2, startIndex + 3);
+            }
+
+            private static void AddTriangle(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Color color)
+            {
+                int startIndex = vh.currentVertCount;
+                AddVertex(vh, a, color);
+                AddVertex(vh, b, color);
+                AddVertex(vh, c, color);
+                vh.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
+            }
+
+            private static void AddVertex(VertexHelper vh, Vector2 position, Color color)
+            {
+                UIVertex vertex = UIVertex.simpleVert;
+                vertex.position = position;
+                vertex.color = color;
+                vh.AddVert(vertex);
+            }
+
+            private static Vector2 Direction(float degrees)
+            {
+                float radians = degrees * Mathf.Deg2Rad;
+                return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
+            }
         }
     }
 }

@@ -10,8 +10,10 @@ namespace GTX.Progression
     public enum VectorSSScreen
     {
         MainMenu,
+        Pitblock,
         MapSelect,
         VehicleSelect,
+        RaceSettings,
         Garage,
         Racing,
         Paused,
@@ -22,7 +24,8 @@ namespace GTX.Progression
     {
         BlacklineCircuit,
         ScraplineYard,
-        RubberRidge
+        RubberRidge,
+        SpecialStage
     }
 
     public enum VectorSSVehicleId
@@ -132,6 +135,9 @@ namespace GTX.Progression
         [Range(0f, 1f)] public float cameraShake = 0.5f;
         [Range(0.45f, 1.8f)] public float leanResponse = 1f;
         [Range(0.45f, 1.85f)] public float rearBrakeSlide = 1f;
+        [Range(0, 5)] public int rivalCount = 3;
+        [Range(1, 99)] public int raceLapCount = 3;
+        public bool endlessRace;
         public bool automaticTransmission;
 
         public void CopyFrom(VectorSSTuningState other)
@@ -153,6 +159,9 @@ namespace GTX.Progression
             cameraShake = other.cameraShake;
             leanResponse = other.leanResponse;
             rearBrakeSlide = other.rearBrakeSlide;
+            rivalCount = other.rivalCount;
+            raceLapCount = other.raceLapCount;
+            endlessRace = other.endlessRace;
             automaticTransmission = other.automaticTransmission;
         }
     }
@@ -251,7 +260,7 @@ namespace GTX.Progression
         public VectorSSVehicleClass? allowedClass;
         public string controlHint;
         public Vector2 defaultHudPosition = new Vector2(1488f, -210f);
-        public float defaultHudScale = 0.9f;
+        public float defaultHudScale = 1.8f;
 
         public bool Supports(VectorSSVehicleDefinition vehicle)
         {
@@ -279,7 +288,8 @@ namespace GTX.Progression
         public VectorSSVehicleId vehicleId;
         public string moduleId;
         public Vector2 position;
-        public float scale = 0.9f;
+        public Vector2 size = new Vector2(202f, 64f);
+        public float scale = 1.8f;
         public bool visible = true;
 
         public void ResetToDefinition(VectorSSVehicleId vehicle, VectorSSModuleDefinition module)
@@ -287,7 +297,8 @@ namespace GTX.Progression
             vehicleId = vehicle;
             moduleId = module != null ? module.id : moduleId;
             position = module != null ? module.defaultHudPosition : new Vector2(1488f, -210f);
-            scale = module != null ? module.defaultHudScale : 0.9f;
+            size = new Vector2(202f, 64f);
+            scale = module != null ? module.defaultHudScale : 1.8f;
             visible = true;
         }
     }
@@ -299,9 +310,12 @@ namespace GTX.Progression
         public float raceTime;
         public float flow01;
         public int combatScore;
+        public int placement = 1;
+        public int fieldSize = 1;
         public VectorSSResources completionReward;
         public VectorSSResources styleReward;
         public VectorSSResources mapReward;
+        public int scrapCubes;
 
         public VectorSSResources Total
         {
@@ -318,6 +332,7 @@ namespace GTX.Progression
     public sealed class VectorSSPlayerProfile
     {
         public VectorSSResources resources = new VectorSSResources(100, 90, 100);
+        public int scrapCubes;
         public VectorSSMapId selectedMap = VectorSSMapId.BlacklineCircuit;
         public VectorSSVehicleId selectedVehicle = VectorSSVehicleId.Hammer;
         public VectorSSTuningState tuning = new VectorSSTuningState();
@@ -665,6 +680,19 @@ namespace GTX.Progression
                 roadColor = VectrStyleTokens.MapRoad(VectorSSMapId.RubberRidge),
                 groundColor = VectrStyleTokens.MapGround(VectorSSMapId.RubberRidge),
                 barrierColor = VectrStyleTokens.MapBarrier(VectorSSMapId.RubberRidge)
+            },
+            new VectorSSMapDefinition
+            {
+                id = VectorSSMapId.SpecialStage,
+                displayName = "Special Stage",
+                purpose = "Wide-open city drift test stage",
+                theme = "Open city streets, plazas, big intersections, and buildings to drift around.",
+                lapCount = 3,
+                baseReward = new VectorSSResources(28, 34, 34),
+                mapBonus = new VectorSSResources(12, 18, 18),
+                roadColor = VectrStyleTokens.MapRoad(VectorSSMapId.SpecialStage),
+                groundColor = VectrStyleTokens.MapGround(VectorSSMapId.SpecialStage),
+                barrierColor = VectrStyleTokens.MapBarrier(VectorSSMapId.SpecialStage)
             }
         };
 
@@ -848,6 +876,7 @@ namespace GTX.Progression
                 PlayerPrefs.GetInt(Prefix + "Metal", profile.resources.metal),
                 PlayerPrefs.GetInt(Prefix + "Plastic", profile.resources.plastic),
                 PlayerPrefs.GetInt(Prefix + "Rubber", profile.resources.rubber));
+            profile.scrapCubes = Mathf.Max(0, PlayerPrefs.GetInt(Prefix + "ScrapCubes", profile.scrapCubes));
 
             profile.selectedMap = (VectorSSMapId)PlayerPrefs.GetInt(Prefix + "Map", (int)profile.selectedMap);
             profile.selectedVehicle = (VectorSSVehicleId)PlayerPrefs.GetInt(Prefix + "Vehicle", (int)profile.selectedVehicle);
@@ -879,6 +908,7 @@ namespace GTX.Progression
             PlayerPrefs.SetInt(Prefix + "Metal", profile.resources.metal);
             PlayerPrefs.SetInt(Prefix + "Plastic", profile.resources.plastic);
             PlayerPrefs.SetInt(Prefix + "Rubber", profile.resources.rubber);
+            PlayerPrefs.SetInt(Prefix + "ScrapCubes", Mathf.Max(0, profile.scrapCubes));
             PlayerPrefs.SetInt(Prefix + "Map", (int)profile.selectedMap);
             PlayerPrefs.SetInt(Prefix + "Vehicle", (int)profile.selectedVehicle);
             SaveTuning(profile.tuning);
@@ -902,6 +932,9 @@ namespace GTX.Progression
             tuning.cameraShake = PlayerPrefs.GetFloat(Prefix + "Tune.CameraShake", tuning.cameraShake);
             tuning.leanResponse = PlayerPrefs.GetFloat(Prefix + "Tune.LeanResponse", tuning.leanResponse);
             tuning.rearBrakeSlide = PlayerPrefs.GetFloat(Prefix + "Tune.RearBrakeSlide", tuning.rearBrakeSlide);
+            tuning.rivalCount = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "Tune.RivalCount", tuning.rivalCount), 0, 5);
+            tuning.raceLapCount = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "Tune.RaceLapCount", tuning.raceLapCount), 1, 99);
+            tuning.endlessRace = PlayerPrefs.GetInt(Prefix + "Tune.EndlessRace", tuning.endlessRace ? 1 : 0) == 1;
             tuning.automaticTransmission = PlayerPrefs.GetInt(Prefix + "Tune.AutomaticTransmission", tuning.automaticTransmission ? 1 : 0) == 1;
         }
 
@@ -919,6 +952,9 @@ namespace GTX.Progression
             PlayerPrefs.SetFloat(Prefix + "Tune.CameraShake", tuning.cameraShake);
             PlayerPrefs.SetFloat(Prefix + "Tune.LeanResponse", tuning.leanResponse);
             PlayerPrefs.SetFloat(Prefix + "Tune.RearBrakeSlide", tuning.rearBrakeSlide);
+            PlayerPrefs.SetInt(Prefix + "Tune.RivalCount", Mathf.Clamp(tuning.rivalCount, 0, 5));
+            PlayerPrefs.SetInt(Prefix + "Tune.RaceLapCount", Mathf.Clamp(tuning.raceLapCount, 1, 99));
+            PlayerPrefs.SetInt(Prefix + "Tune.EndlessRace", tuning.endlessRace ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "Tune.AutomaticTransmission", tuning.automaticTransmission ? 1 : 0);
         }
 
@@ -1002,7 +1038,7 @@ namespace GTX.Progression
             for (int i = 0; i < entries.Length; i++)
             {
                 string[] parts = entries[i].Split(':');
-                if (parts.Length != 6)
+                if (parts.Length != 6 && parts.Length != 8)
                 {
                     continue;
                 }
@@ -1022,8 +1058,26 @@ namespace GTX.Progression
                 float x;
                 float y;
                 float scale;
+                float width = 202f;
+                float height = 64f;
                 bool visible;
-                if (!TryParseFloat(parts[2], out x) || !TryParseFloat(parts[3], out y) || !TryParseFloat(parts[4], out scale) || !bool.TryParse(parts[5], out visible))
+                if (!TryParseFloat(parts[2], out x) || !TryParseFloat(parts[3], out y) || !TryParseFloat(parts[4], out scale))
+                {
+                    continue;
+                }
+
+                int visibleIndex = 5;
+                if (parts.Length == 8)
+                {
+                    if (!TryParseFloat(parts[5], out width) || !TryParseFloat(parts[6], out height))
+                    {
+                        continue;
+                    }
+
+                    visibleIndex = 7;
+                }
+
+                if (!bool.TryParse(parts[visibleIndex], out visible))
                 {
                     continue;
                 }
@@ -1033,7 +1087,8 @@ namespace GTX.Progression
                     vehicleId = vehicleId,
                     moduleId = moduleId,
                     position = new Vector2(x, y),
-                    scale = Mathf.Clamp(scale, 0.55f, 1.35f),
+                    size = new Vector2(Mathf.Clamp(width, 96f, 720f), Mathf.Clamp(height, 38f, 360f)),
+                    scale = Mathf.Clamp(scale, 0.55f, 2.7f),
                     visible = visible
                 };
             }
@@ -1054,6 +1109,8 @@ namespace GTX.Progression
                     FormatFloat(layout.position.x) + ":" +
                     FormatFloat(layout.position.y) + ":" +
                     FormatFloat(layout.scale) + ":" +
+                    FormatFloat(layout.size.x) + ":" +
+                    FormatFloat(layout.size.y) + ":" +
                     layout.visible);
             }
 
@@ -1157,6 +1214,7 @@ namespace GTX.Progression
             tuning.boostTorqueMultiplier = 1f + (tuning.boostTorqueMultiplier - 1f) * vehicle.boostMultiplier * t.boostValve * (profile.HasUpgrade("boost_valve_1") ? 1.14f : 1f);
             tuning.boostBurnPerSecond *= Mathf.Lerp(1.12f, 0.86f, Mathf.InverseLerp(0.45f, 1.85f, t.boostValve));
             tuning.downforce *= t.suspension;
+            tuning.bikeHandling = vehicle.isBike;
 
             if (profile.HasUpgrade("combat_plating_1"))
             {
@@ -1173,7 +1231,15 @@ namespace GTX.Progression
             if (vehicle.isBike)
             {
                 tuning.mass *= profile.HasUpgrade("lightweight_frame_1") ? 0.94f : 1f;
-                tuning.steeringAngle *= profile.HasUpgrade("lean_stabilizer_1") ? 1.06f : 1f;
+                tuning.steeringAngle *= 0.72f * (profile.HasUpgrade("lean_stabilizer_1") ? 1.06f : 1f);
+                tuning.steeringAngleAtSpeed *= 1.08f;
+                tuning.arcadeYawAssist *= 0.58f;
+                tuning.highSpeedSteeringStability *= 1.42f;
+                tuning.normalSideGrip *= 1.1f;
+                tuning.driftSideGrip *= 1.06f;
+                tuning.driftExitRecovery *= 1.14f;
+                tuning.driftExitYawDamping *= 1.2f;
+                tuning.driftLateralDamping *= 1.18f;
                 tuning.normalSideGrip *= profile.HasUpgrade("razor_tires_1") ? 1.12f : 1f;
                 tuning.driftSideGrip *= profile.HasUpgrade("razor_tires_1") ? 1.12f : 1f;
                 tuning.boostTorqueMultiplier *= profile.HasUpgrade("boost_tuck_1") ? 1.08f : 1f;
@@ -1250,7 +1316,7 @@ namespace GTX.Progression
             return multiplier;
         }
 
-        public static VectorSSRaceResult BuildRaceResult(VectorSSMapDefinition map, VectorSSVehicleDefinition vehicle, float raceTime, float flow01, int combatScore)
+        public static VectorSSRaceResult BuildRaceResult(VectorSSMapDefinition map, VectorSSVehicleDefinition vehicle, float raceTime, float flow01, int combatScore, int placement = 1, int fieldSize = 1)
         {
             int style = Mathf.RoundToInt(Mathf.Clamp01(flow01) * 34f);
             int combat = Mathf.Clamp(combatScore, 0, 24);
@@ -1261,9 +1327,12 @@ namespace GTX.Progression
                 raceTime = raceTime,
                 flow01 = flow01,
                 combatScore = combatScore,
+                placement = Mathf.Max(1, placement),
+                fieldSize = Mathf.Max(1, fieldSize),
                 completionReward = map.baseReward,
                 styleReward = new VectorSSResources(6 + combat, 8 + style / 2, 8 + style),
-                mapReward = map.mapBonus
+                mapReward = map.mapBonus,
+                scrapCubes = Mathf.Max(1, Mathf.RoundToInt(1f + Mathf.Clamp01(flow01) * 2f + Mathf.Max(0, combatScore) * 0.05f + (placement == 1 ? 1f : 0f)))
             };
         }
     }

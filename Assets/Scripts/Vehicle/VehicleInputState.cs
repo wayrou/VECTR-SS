@@ -12,6 +12,7 @@ namespace GTX.Vehicle
         [Range(0f, 1f)] public float clutch;
         public bool handbrake;
         public bool boost;
+        public bool jump;
         public bool shiftUp;
         public bool shiftDown;
         public bool shiftDownHeld;
@@ -49,9 +50,10 @@ namespace GTX.Vehicle
                 clutch = clutch,
                 handbrake = Input.GetKey(KeyCode.Space) || GTXInput.Button(0),
                 boost = Input.GetKey(KeyCode.F) || GTXInput.Button(1) || GTXInput.Button(5),
-                shiftUp = Input.GetKeyDown(KeyCode.E) || GTXInput.ButtonDown(3),
-                shiftDown = Input.GetKeyDown(KeyCode.Q) || GTXInput.ButtonDown(2),
-                shiftDownHeld = Input.GetKey(KeyCode.Q) || GTXInput.Button(2)
+                jump = Input.GetKey(KeyCode.J) || GTXInput.Button(3),
+                shiftUp = Input.GetKeyDown(KeyCode.E),
+                shiftDown = Input.GetKeyDown(KeyCode.Q),
+                shiftDownHeld = Input.GetKey(KeyCode.Q)
             };
 
             input.steer = Mathf.Clamp(input.steer, -1f, 1f);

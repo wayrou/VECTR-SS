@@ -61,7 +61,12 @@ namespace GTX.Vehicle
 
         public float GetTorqueMultiplier(VehicleTuning tuning)
         {
-            return IsActive && tuning != null ? tuning.boostTorqueMultiplier : 1f;
+            if (!IsActive || tuning == null)
+            {
+                return 1f;
+            }
+
+            return 1f + (tuning.boostTorqueMultiplier - 1f) * 3f;
         }
     }
 }

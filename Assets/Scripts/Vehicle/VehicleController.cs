@@ -1,4 +1,5 @@
 using GTX.Data;
+using GTX.Visuals;
 using UnityEngine;
 
 namespace GTX.Vehicle
@@ -41,6 +42,7 @@ namespace GTX.Vehicle
         public float ClutchTransfer { get; private set; }
         public float RuntimeBrakeBias { get; set; } = 0.5f;
         public bool AutomaticTransmission { get; set; }
+        public bool InputLocked { get; set; }
 
         private Rigidbody body;
         private WheelCollider[] driveWheels;
@@ -51,6 +53,27 @@ namespace GTX.Vehicle
         private float collisionRecoveryTimer;
         private VehicleInputState externalInput;
         private float shapedSteer;
+        private float previousDriftAmountForSteering;
+        private float driftExitSteeringAssistTimer;
+        private float jumpCooldownTimer;
+        private RuntimeImpactEffects impactEffects;
+        private const float SteeringRangeMultiplier = 1.0f;
+        private const float SteeringYawAuthorityMultiplier = 1.85f;
+        private const float CornerDriveAssistForce = 18f;
+        private const float VelocitySteeringAssist = 2.1f;
+        private const float TrailBrakeSteeringTorque = 3.8f;
+        private const float TrailBrakeVelocitySteeringAssist = 1.15f;
+        private const float TestJumpVelocity = 7.28f;
+        private const float TestJumpForwardKick = 0f;
+        private const float TestJumpCooldown = 0.72f;
+        private const float ControllableTopSpeed = 60f;
+        private const float BoostTopSpeed = 68f;
+        private const float HardSpeedLimit = 74f;
+        private const float HighSpeedStabilityStart = 34f;
+        private const float HighSpeedStabilityFull = 68f;
+        private const float HighSpeedLateralDamping = 3.4f;
+        private const float HighSpeedYawDamping = 4.8f;
+        private const float DriftExitSteeringAssistDuration = 0.82f;
 
         public void SetInput(VehicleInputState input)
         {
@@ -117,6 +140,12 @@ namespace GTX.Vehicle
             }
 
             float dt = Time.fixedDeltaTime;
+            jumpCooldownTimer = Mathf.Max(0f, jumpCooldownTimer - dt);
+            if (InputLocked)
+            {
+                externalInput = default;
+            }
+
             CurrentInput = ShapeInput(externalInput, dt);
             if (AutomaticTransmission)
             {
@@ -139,12 +168,14 @@ namespace GTX.Vehicle
 
             boost.Tick(tuning, CurrentInput.boost, CurrentInput.throttle, dt);
             drift.Tick(tuning, body, CurrentInput, dt);
+            UpdateDriftExitSteeringAssist(dt);
 
             ClutchTransfer = CalculateClutchTransfer(CurrentInput.clutch);
             float drivetrainRpm = CalculateDrivetrainRpm();
             engine.Tick(tuning, CurrentInput.throttle, ClutchTransfer, drivetrainRpm, dt);
 
             ApplyWheelControls();
+            ApplyTestJump();
             ApplyArcadeForces(dt);
         }
 
@@ -178,6 +209,29 @@ namespace GTX.Vehicle
             boost.Reset(tuning);
             drift.Reset();
             shapedSteer = 0f;
+            previousDriftAmountForSteering = 0f;
+            driftExitSteeringAssistTimer = 0f;
+            jumpCooldownTimer = 0f;
+        }
+
+        private void UpdateDriftExitSteeringAssist(float deltaTime)
+        {
+            if (drift == null)
+            {
+                return;
+            }
+
+            if (previousDriftAmountForSteering > 0.28f && drift.DriftAmount < previousDriftAmountForSteering - 0.001f)
+            {
+                driftExitSteeringAssistTimer = Mathf.Max(driftExitSteeringAssistTimer, DriftExitSteeringAssistDuration);
+            }
+
+            if (drift.DriftAmount < 0.18f)
+            {
+                driftExitSteeringAssistTimer = Mathf.Max(0f, driftExitSteeringAssistTimer - deltaTime);
+            }
+
+            previousDriftAmountForSteering = drift.DriftAmount;
         }
 
         private VehicleInputState ShapeInput(VehicleInputState input, float deltaTime)
@@ -214,23 +268,7 @@ namespace GTX.Vehicle
             input.clutch = 0f;
 
             float forwardSpeed = body != null ? Vector3.Dot(body.velocity, transform.forward) : 0f;
-            bool reverseHeld = input.brake > 0.08f && input.throttle < 0.08f;
             bool forwardHeld = input.throttle > 0.08f;
-
-            if (reverseHeld && forwardSpeed <= 0.45f)
-            {
-                float reversePower = Mathf.Clamp01(input.brake);
-                if (gearbox.CurrentGear != GearboxController.ReverseGear)
-                {
-                    gearbox.ForceShiftImmediate(tuning, GearboxController.ReverseGear);
-                }
-
-                input.shiftDownHeld = false;
-                input.shiftDown = false;
-                input.throttle = reversePower;
-                input.brake = 0f;
-                return input;
-            }
 
             if (gearbox.CurrentGear == GearboxController.ReverseGear && forwardHeld)
             {
@@ -349,8 +387,13 @@ namespace GTX.Vehicle
         {
             float speed01 = Mathf.InverseLerp(0f, tuning.steeringSpeedReference, SpeedMetersPerSecond);
             float lowSpeedAssist = Mathf.Lerp(1f + tuning.lowSpeedSteeringAssist, 1f, speed01);
-            float highSpeedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability), speed01);
-            float steerAngle = Mathf.Lerp(tuning.steeringAngle, tuning.steeringAngleAtSpeed, speed01) * lowSpeedAssist * highSpeedStability * CurrentInput.steer;
+            float exitAssist01 = Mathf.Clamp01(driftExitSteeringAssistTimer / DriftExitSteeringAssistDuration);
+            float stabilityCut = Mathf.Lerp(0.3f, 0.18f, exitAssist01);
+            float highSpeedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability) * stabilityCut, speed01);
+            float fullSteeringAngle = tuning.steeringAngle * SteeringRangeMultiplier;
+            float highSpeedFloor = tuning.bikeHandling ? Mathf.Lerp(0.34f, 0.48f, exitAssist01) : Mathf.Lerp(0.62f, 0.78f, exitAssist01);
+            float highSpeedAngle = Mathf.Max(tuning.steeringAngleAtSpeed * SteeringRangeMultiplier, fullSteeringAngle * highSpeedFloor);
+            float steerAngle = Mathf.Lerp(fullSteeringAngle, highSpeedAngle, speed01) * lowSpeedAssist * highSpeedStability * CurrentInput.steer;
             SetSteer(frontLeft, steerAngle);
             SetSteer(frontRight, steerAngle);
 
@@ -360,7 +403,8 @@ namespace GTX.Vehicle
             float boostMultiplier = boost.GetTorqueMultiplier(tuning);
             float tractionMultiplier = CalculateTractionMultiplier();
             float wheelTorque = crankTorque * ratio * ClutchTransfer * shiftMultiplier * boostMultiplier * tractionMultiplier;
-            wheelTorque = Mathf.Clamp(wheelTorque, -tuning.maxDriveTorque, tuning.maxDriveTorque);
+            float torqueLimit = tuning.maxDriveTorque * (boost.IsActive ? Mathf.Max(1f, boostMultiplier) : 1f);
+            wheelTorque = Mathf.Clamp(wheelTorque, -torqueLimit, torqueLimit);
 
             ApplyDriveTorque(wheelTorque);
             ApplyBrakes();
@@ -415,9 +459,14 @@ namespace GTX.Vehicle
 
         private void ApplyBrakes()
         {
-            float serviceBrake = CurrentInput.brake * tuning.brakeTorque;
+            float brake01 = Mathf.Clamp01(CurrentInput.brake);
+            float steerAbs = Mathf.Abs(CurrentInput.steer);
+            float serviceBrake = brake01 * tuning.brakeTorque;
             float frontBrake = serviceBrake * Mathf.Lerp(0.82f, 1.24f, Mathf.Clamp01(RuntimeBrakeBias));
             float rearBrake = serviceBrake * Mathf.Lerp(1.24f, 0.82f, Mathf.Clamp01(RuntimeBrakeBias));
+            float trailBrakeRelief = brake01 * Mathf.InverseLerp(0.12f, 0.72f, steerAbs);
+            frontBrake *= Mathf.Lerp(1f, 0.56f, trailBrakeRelief);
+            rearBrake *= Mathf.Lerp(1f, 0.74f, trailBrakeRelief);
             bool hasWheelBrakes = false;
             if (frontLeft != null)
             {
@@ -449,8 +498,8 @@ namespace GTX.Vehicle
 
             if (!hasWheelBrakes && body != null)
             {
-                float brake01 = Mathf.Clamp01(CurrentInput.brake + (CurrentInput.handbrake ? 1f : 0f));
-                body.AddForce(-body.velocity * tuning.rigidbodyFallbackBrakeDrag * brake01, ForceMode.Acceleration);
+                float fallbackBrake01 = Mathf.Clamp01(CurrentInput.brake + (CurrentInput.handbrake ? 1f : 0f));
+                body.AddForce(-body.velocity * tuning.rigidbodyFallbackBrakeDrag * fallbackBrake01, ForceMode.Acceleration);
             }
         }
 
@@ -461,6 +510,11 @@ namespace GTX.Vehicle
             float rearGrip = CurrentInput.handbrake ? Mathf.Lerp(driftGrip, entryGrip, drift.EntryAmount) : driftGrip;
             rearGrip = Mathf.Lerp(rearGrip, tuning.normalSideGrip * 0.9f, drift.CounterSteerAmount * drift.DriftAmount * 0.45f);
             float frontGrip = Mathf.Lerp(tuning.normalSideGrip, tuning.normalSideGrip * 1.18f, drift.CounterSteerAmount * drift.DriftAmount);
+            float highSpeedSteeringGrip = Mathf.InverseLerp(18f, 54f, SpeedMetersPerSecond) * Mathf.Abs(CurrentInput.steer) * 0.34f;
+            frontGrip = Mathf.Lerp(frontGrip, tuning.normalSideGrip * 1.36f, highSpeedSteeringGrip);
+            float brakeSteerGrip = Mathf.Clamp01(CurrentInput.brake * Mathf.Abs(CurrentInput.steer));
+            frontGrip = Mathf.Lerp(frontGrip, tuning.normalSideGrip * 1.42f, brakeSteerGrip * 0.34f);
+            rearGrip = Mathf.Lerp(rearGrip, tuning.normalSideGrip * 0.86f, brakeSteerGrip * 0.2f);
             SetSideGrip(frontLeft, frontGrip);
             SetSideGrip(frontRight, frontGrip);
             SetSideGrip(rearLeft, rearGrip);
@@ -476,18 +530,222 @@ namespace GTX.Vehicle
 
             float speed = SpeedMetersPerSecond;
             body.AddForce(-transform.up * tuning.downforce * speed, ForceMode.Force);
+            ApplySpeedGovernor(speed);
+            ApplyHighSpeedStability(speed, deltaTime);
+            ApplyCornerDriveAssist(speed, deltaTime);
+            ApplyTrailBrakeSteeringAssist(speed, deltaTime);
             float lowSpeedYawAssist = Mathf.InverseLerp(18f, 3f, speed) * 0.35f;
             float handbrakeYawAssist = CurrentInput.handbrake ? Mathf.InverseLerp(tuning.driftMinSpeed, tuning.driftMinSpeed + 10f, speed) : 0f;
-            float yawAssist = Mathf.Max(lowSpeedYawAssist, handbrakeYawAssist);
+            float exitSteeringAssist01 = Mathf.Clamp01(driftExitSteeringAssistTimer / DriftExitSteeringAssistDuration);
+            float highSpeedYawAssist = Mathf.InverseLerp(8f, 52f, speed) * Mathf.InverseLerp(76f, 52f, speed) * Mathf.Lerp(0.2f, 0.34f, exitSteeringAssist01);
+            float yawAssist = Mathf.Max(lowSpeedYawAssist, handbrakeYawAssist, highSpeedYawAssist);
             if (yawAssist > 0.001f)
             {
-                float speedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability), Mathf.InverseLerp(18f, 58f, speed));
-                body.AddRelativeTorque(Vector3.up * CurrentInput.steer * tuning.arcadeYawAssist * speedStability * yawAssist, ForceMode.Acceleration);
+                float speedStability = Mathf.Lerp(1f, 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability) * Mathf.Lerp(0.55f, 0.28f, exitSteeringAssist01), Mathf.InverseLerp(18f, 58f, speed));
+                float yawAuthority = tuning.bikeHandling ? 0.48f : 1f;
+                body.AddRelativeTorque(Vector3.up * CurrentInput.steer * tuning.arcadeYawAssist * SteeringYawAuthorityMultiplier * yawAuthority * speedStability * yawAssist, ForceMode.Acceleration);
             }
 
             ApplyLaunchAndCollisionRecovery(deltaTime);
             drift.ApplyArcadeAssist(tuning, body, CurrentInput, deltaTime);
             ApplyDriftExitBoost();
+        }
+
+        private void ApplySpeedGovernor(float speed)
+        {
+            Vector3 flatVelocity = body.velocity;
+            flatVelocity.y = 0f;
+            float flatSpeed = flatVelocity.magnitude;
+            if (flatSpeed <= 0.01f)
+            {
+                return;
+            }
+
+            float softLimit = boost.IsActive ? BoostTopSpeed : ControllableTopSpeed;
+            float overSoft = Mathf.Max(0f, flatSpeed - softLimit);
+            if (overSoft > 0f)
+            {
+                float drag = overSoft * Mathf.Lerp(0.72f, 2.35f, Mathf.InverseLerp(softLimit, HardSpeedLimit, flatSpeed));
+                body.AddForce(-flatVelocity.normalized * drag, ForceMode.Acceleration);
+            }
+
+            if (flatSpeed > HardSpeedLimit)
+            {
+                Vector3 clampedFlat = flatVelocity.normalized * HardSpeedLimit;
+                body.velocity = new Vector3(clampedFlat.x, body.velocity.y, clampedFlat.z);
+            }
+        }
+
+        private void ApplyHighSpeedStability(float speed, float deltaTime)
+        {
+            if (speed < HighSpeedStabilityStart || CurrentInput.handbrake)
+            {
+                return;
+            }
+
+            float driftSuppression = drift != null ? Mathf.InverseLerp(0.5f, 0.12f, drift.DriftAmount) : 1f;
+            float stability01 = Mathf.InverseLerp(HighSpeedStabilityStart, HighSpeedStabilityFull, speed) * driftSuppression;
+            if (tuning.bikeHandling)
+            {
+                stability01 *= 0.58f;
+            }
+
+            if (stability01 <= 0.001f)
+            {
+                return;
+            }
+
+            float steerAbs = Mathf.Abs(CurrentInput.steer);
+            Vector3 localVelocity = transform.InverseTransformDirection(body.velocity);
+            float lateralDamping = HighSpeedLateralDamping * stability01 * Mathf.Lerp(1f, 0.58f, steerAbs);
+            localVelocity.x = Mathf.Lerp(localVelocity.x, 0f, Mathf.Clamp01(lateralDamping * deltaTime));
+            Vector3 stabilizedVelocity = transform.TransformDirection(localVelocity);
+            body.velocity = new Vector3(stabilizedVelocity.x, body.velocity.y, stabilizedVelocity.z);
+
+            float yawVelocity = Vector3.Dot(body.angularVelocity, Vector3.up);
+            float yawDamping = HighSpeedYawDamping * stability01 * Mathf.Lerp(1f, 0.62f, steerAbs);
+            body.AddTorque(-Vector3.up * yawVelocity * yawDamping, ForceMode.Acceleration);
+        }
+
+        private void ApplyCornerDriveAssist(float speed, float deltaTime)
+        {
+            float throttle = Mathf.Clamp01(CurrentInput.throttle);
+            float steerAbs = Mathf.Abs(CurrentInput.steer);
+            bool drivingForward = throttle > 0.08f && gearbox.CurrentGear > GearboxController.NeutralGear;
+            if (!drivingForward || steerAbs <= 0.04f || drift.DriftAmount > 0.12f)
+            {
+                return;
+            }
+
+            float speed01 = Mathf.InverseLerp(5f, 58f, speed);
+            float cornerAssist = Mathf.Clamp01(steerAbs * Mathf.Lerp(0.45f, 1f, speed01));
+            float bikeAssistScale = tuning.bikeHandling ? 0.38f : 1f;
+            body.AddForce(transform.forward * throttle * cornerAssist * CornerDriveAssistForce * bikeAssistScale, ForceMode.Acceleration);
+
+            Vector3 flatVelocity = body.velocity;
+            flatVelocity.y = 0f;
+            if (flatVelocity.sqrMagnitude < 0.25f)
+            {
+                return;
+            }
+
+            Vector3 desiredDirection = Quaternion.AngleAxis(CurrentInput.steer * Mathf.Lerp(6f, 18f, speed01), Vector3.up) * transform.forward;
+            desiredDirection.y = 0f;
+            if (desiredDirection.sqrMagnitude < 0.001f)
+            {
+                return;
+            }
+
+            Vector3 desiredVelocity = desiredDirection.normalized * flatVelocity.magnitude;
+            Vector3 steeredVelocity = Vector3.Lerp(flatVelocity, desiredVelocity, Mathf.Clamp01(VelocitySteeringAssist * bikeAssistScale * cornerAssist * deltaTime));
+            body.velocity = new Vector3(steeredVelocity.x, body.velocity.y, steeredVelocity.z);
+        }
+
+        private void ApplyTrailBrakeSteeringAssist(float speed, float deltaTime)
+        {
+            float brake = Mathf.Clamp01(CurrentInput.brake);
+            float steerAbs = Mathf.Abs(CurrentInput.steer);
+            bool brakingForward = brake > 0.08f && speed > 2.5f && !CurrentInput.handbrake && gearbox.CurrentGear > GearboxController.NeutralGear;
+            if (!brakingForward || steerAbs <= 0.035f || drift.DriftAmount > 0.18f)
+            {
+                return;
+            }
+
+            float speed01 = Mathf.InverseLerp(4f, 46f, speed);
+            float authority = brake * steerAbs * Mathf.Lerp(0.9f, 0.42f, speed01);
+            float stability = 1f - Mathf.Clamp01(tuning.highSpeedSteeringStability) * Mathf.Lerp(0.15f, 0.34f, speed01);
+            float bikeTrailScale = tuning.bikeHandling ? 0.46f : 1f;
+            body.AddRelativeTorque(Vector3.up * Mathf.Sign(CurrentInput.steer) * TrailBrakeSteeringTorque * bikeTrailScale * authority * stability, ForceMode.Acceleration);
+
+            Vector3 flatVelocity = body.velocity;
+            flatVelocity.y = 0f;
+            if (flatVelocity.sqrMagnitude < 0.4f)
+            {
+                return;
+            }
+
+            Vector3 desiredDirection = Quaternion.AngleAxis(CurrentInput.steer * Mathf.Lerp(5f, 12f, speed01), Vector3.up) * transform.forward;
+            desiredDirection.y = 0f;
+            if (desiredDirection.sqrMagnitude < 0.001f)
+            {
+                return;
+            }
+
+            Vector3 desiredVelocity = desiredDirection.normalized * flatVelocity.magnitude;
+            Vector3 steeredVelocity = Vector3.Lerp(flatVelocity, desiredVelocity, Mathf.Clamp01(TrailBrakeVelocitySteeringAssist * bikeTrailScale * authority * deltaTime));
+            body.velocity = new Vector3(steeredVelocity.x, body.velocity.y, steeredVelocity.z);
+        }
+
+        private void ApplyTestJump()
+        {
+            if (!CurrentInput.jump || body == null || jumpCooldownTimer > 0f || !AnyWheelGrounded())
+            {
+                return;
+            }
+
+            Vector3 flatForward = transform.forward;
+            flatForward.y = 0f;
+            if (flatForward.sqrMagnitude < 0.001f)
+            {
+                flatForward = Vector3.forward;
+            }
+
+            Vector3 velocity = body.velocity;
+            if (velocity.y < TestJumpVelocity)
+            {
+                velocity.y = TestJumpVelocity;
+            }
+
+            body.velocity = velocity;
+            body.AddForce(flatForward.normalized * TestJumpForwardKick, ForceMode.VelocityChange);
+            body.angularVelocity *= 0.65f;
+            PlayJumpEffects(flatForward.normalized);
+            jumpCooldownTimer = TestJumpCooldown;
+        }
+
+        private void PlayJumpEffects(Vector3 flatForward)
+        {
+            if (impactEffects == null)
+            {
+                impactEffects = GetComponent<RuntimeImpactEffects>();
+            }
+
+            if (impactEffects == null)
+            {
+                return;
+            }
+
+            impactEffects.PlayJumpBurst(transform.position - Vector3.up * 0.28f, flatForward, 1f);
+        }
+
+        private bool AnyWheelGrounded()
+        {
+            bool hasWheel = false;
+            if (allWheels != null)
+            {
+                for (int i = 0; i < allWheels.Length; i++)
+                {
+                    WheelCollider wheel = allWheels[i];
+                    if (wheel == null)
+                    {
+                        continue;
+                    }
+
+                    hasWheel = true;
+                    WheelHit hit;
+                    if (wheel.isGrounded || wheel.GetGroundHit(out hit))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (body != null && Physics.Raycast(transform.position + Vector3.up * 0.45f, Vector3.down, 1.75f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                return true;
+            }
+
+            return !hasWheel;
         }
 
         private void ApplyDriftExitBoost()

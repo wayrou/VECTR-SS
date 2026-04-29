@@ -134,6 +134,7 @@ namespace GTX.Core
                 flowState.AddFlow(4.5f);
                 effects?.PlayBoostFlash(transform, 0.55f + flowState.Normalized * 0.25f);
                 effects?.PlaySpeedLines(transform, 0.48f + flowState.Normalized * 0.22f);
+                effects?.PlayNicePanel(transform);
             }
 
             previousDriftExitBoostTimer = exitTimer;

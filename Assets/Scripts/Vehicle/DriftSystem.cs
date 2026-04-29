@@ -240,11 +240,7 @@ namespace GTX.Vehicle
                 body.AddTorque(Vector3.up * -yawDamping, ForceMode.Acceleration);
             }
 
-            if (input.throttle > 0.1f)
-            {
-                float forwardAssist = tuning.driftForwardAssist * input.throttle * Mathf.Max(DriftAmount, ExitBoostTimer > 0f ? 0.42f : 0f) * Mathf.Lerp(1f, 0.62f, exitControl01);
-                body.AddForce(body.transform.forward * forwardAssist, ForceMode.Acceleration);
-            }
+            // Drift speed rewards are handled by VehicleController.ApplyDriftExitBoost after a clean exit.
         }
     }
 }

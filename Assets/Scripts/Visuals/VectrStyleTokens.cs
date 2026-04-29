@@ -5,20 +5,20 @@ namespace GTX.Visuals
 {
     public static class VectrStyleTokens
     {
-        public static readonly Color InkBlack = new Color(0.006f, 0.008f, 0.012f, 1f);
-        public static readonly Color AsphaltNavy = new Color(0.045f, 0.064f, 0.095f, 1f);
-        public static readonly Color WarmConcreteGray = new Color(0.55f, 0.55f, 0.50f, 1f);
-        public static readonly Color BoneWhite = new Color(0.93f, 0.89f, 0.76f, 1f);
-        public static readonly Color OilGray = new Color(0.14f, 0.15f, 0.16f, 1f);
-        public static readonly Color RubberBlack = new Color(0.025f, 0.027f, 0.028f, 1f);
-        public static readonly Color SignalRed = new Color(0.94f, 0.08f, 0.055f, 1f);
-        public static readonly Color SafetyOrange = new Color(1f, 0.42f, 0.045f, 1f);
-        public static readonly Color ElectricCyan = new Color(0.03f, 0.86f, 1f, 1f);
-        public static readonly Color HotMagenta = new Color(1f, 0.08f, 0.66f, 1f);
-        public static readonly Color AcidYellowGreen = new Color(0.74f, 1f, 0.08f, 1f);
-        public static readonly Color DeepViolet = new Color(0.13f, 0.07f, 0.32f, 1f);
-        public static readonly Color DustTan = new Color(0.67f, 0.52f, 0.34f, 1f);
-        public static readonly Color RustOrange = new Color(0.64f, 0.28f, 0.08f, 1f);
+        public static readonly Color InkBlack = new Color(0.018f, 0.018f, 0.016f, 1f);
+        public static readonly Color AsphaltNavy = new Color(0.072f, 0.082f, 0.086f, 1f);
+        public static readonly Color WarmConcreteGray = new Color(0.54f, 0.53f, 0.47f, 1f);
+        public static readonly Color BoneWhite = new Color(0.90f, 0.86f, 0.72f, 1f);
+        public static readonly Color OilGray = new Color(0.16f, 0.16f, 0.145f, 1f);
+        public static readonly Color RubberBlack = new Color(0.034f, 0.034f, 0.03f, 1f);
+        public static readonly Color SignalRed = new Color(0.66f, 0.08f, 0.055f, 1f);
+        public static readonly Color SafetyOrange = new Color(0.78f, 0.32f, 0.075f, 1f);
+        public static readonly Color ElectricCyan = new Color(0.13f, 0.36f, 0.48f, 1f);
+        public static readonly Color HotMagenta = new Color(0.54f, 0.16f, 0.27f, 1f);
+        public static readonly Color AcidYellowGreen = new Color(0.42f, 0.50f, 0.24f, 1f);
+        public static readonly Color DeepViolet = new Color(0.18f, 0.15f, 0.22f, 1f);
+        public static readonly Color DustTan = new Color(0.62f, 0.49f, 0.33f, 1f);
+        public static readonly Color RustOrange = new Color(0.55f, 0.25f, 0.10f, 1f);
 
         public const float OuterOutlineMultiplier = 1.13f;
         public const float PanelOutlineMultiplier = 1.075f;
@@ -110,6 +110,11 @@ namespace GTX.Visuals
 
         public static Color MapRoad(VectorSSMapId map)
         {
+            if (map == VectorSSMapId.SpecialStage)
+            {
+                return new Color(0.05f, 0.052f, 0.048f, 1f);
+            }
+
             return map == VectorSSMapId.RubberRidge ? RubberBlack : AsphaltNavy;
         }
 
@@ -121,6 +126,8 @@ namespace GTX.Visuals
                     return RustOrange;
                 case VectorSSMapId.RubberRidge:
                     return DustTan;
+                case VectorSSMapId.SpecialStage:
+                    return new Color(0.33f, 0.32f, 0.28f, 1f);
                 default:
                     return WarmConcreteGray;
             }
@@ -134,6 +141,8 @@ namespace GTX.Visuals
                     return new Color(0.63f, 0.61f, 0.54f, 1f);
                 case VectorSSMapId.RubberRidge:
                     return RubberBlack;
+                case VectorSSMapId.SpecialStage:
+                    return new Color(0.66f, 0.65f, 0.58f, 1f);
                 default:
                     return BoneWhite;
             }
@@ -147,6 +156,8 @@ namespace GTX.Visuals
                     return SafetyOrange;
                 case VectorSSMapId.RubberRidge:
                     return AcidYellowGreen;
+                case VectorSSMapId.SpecialStage:
+                    return ElectricCyan;
                 default:
                     return ElectricCyan;
             }

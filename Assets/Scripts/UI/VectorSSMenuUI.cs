@@ -31,9 +31,9 @@ namespace GTX.UI
         private static readonly Color PaperDim = new Color(0.82f, 0.80f, 0.74f, 0.98f);
         private static readonly Color Ink = new Color(0.02f, 0.02f, 0.018f, 1f);
         private static readonly Color InkSoft = new Color(0.12f, 0.12f, 0.105f, 1f);
-        private static readonly Color Blue = new Color(0.06f, 0.30f, 0.82f, 1f);
-        private static readonly Color Orange = new Color(0.95f, 0.33f, 0.06f, 1f);
-        private static readonly Color Green = new Color(0.22f, 0.58f, 0.24f, 1f);
+        private static readonly Color Blue = new Color(0.13f, 0.36f, 0.48f, 1f);
+        private static readonly Color Orange = new Color(0.78f, 0.32f, 0.075f, 1f);
+        private static readonly Color Green = new Color(0.42f, 0.50f, 0.24f, 1f);
 
         [Header("Startup")]
         [SerializeField] private bool buildOnAwake = true;
@@ -687,7 +687,7 @@ namespace GTX.UI
             {
                 maps.Add(new MapOption("mesa-loop", "Mesa Loop", "Short desert loop with wide contact zones.", "BEST 02:12.300", false));
                 maps.Add(new MapOption("dock-yard", "Dock Yard", "Tight concrete course with boost-line exits.", "NEW", false));
-                maps.Add(new MapOption("neon-pass", "Neon Pass", "Night route reserved for progression unlock.", "LOCKED", true));
+                maps.Add(new MapOption("night-pass", "Night Pass", "Mountain route reserved for progression unlock.", "LOCKED", true));
             }
 
             if (vehicles.Count == 0)
@@ -904,6 +904,11 @@ namespace GTX.UI
                 Outline outline = gameObject.AddComponent<Outline>();
                 outline.effectColor = Ink;
                 outline.effectDistance = new Vector2(2f, -2f);
+
+                if (dimensions.x >= 180f && dimensions.y >= 90f)
+                {
+                    gameObject.AddComponent<VectorSSDraggableResizablePanel>();
+                }
             }
 
             return gameObject;

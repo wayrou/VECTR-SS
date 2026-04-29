@@ -6,14 +6,14 @@ namespace GTX.Visuals
     public sealed class RuntimeImpactEffects : MonoBehaviour
     {
         [SerializeField] private Material effectMaterial;
-        [SerializeField] private Color impactColor = new Color(1f, 0.48f, 0.08f, 1f);
-        [SerializeField] private Color boostColor = new Color(0.08f, 0.78f, 1f, 1f);
-        [SerializeField] private Color skidColor = new Color(0.03f, 0.035f, 0.05f, 0.68f);
-        [SerializeField] private Color speedLineColor = new Color(0.95f, 0.98f, 1f, 0.58f);
+        [SerializeField] private Color impactColor = new Color(0.78f, 0.32f, 0.08f, 1f);
+        [SerializeField] private Color boostColor = new Color(0.13f, 0.36f, 0.48f, 1f);
+        [SerializeField] private Color skidColor = new Color(0.04f, 0.04f, 0.036f, 0.68f);
+        [SerializeField] private Color speedLineColor = new Color(0.76f, 0.78f, 0.70f, 0.48f);
 
-        private static readonly Color InkColor = new Color(0.005f, 0.006f, 0.01f, 0.9f);
-        private static readonly Color PaperColor = new Color(1f, 0.98f, 0.9f, 0.86f);
-        private static readonly Color SparkColor = new Color(1f, 0.86f, 0.18f, 0.95f);
+        private static readonly Color InkColor = new Color(0.018f, 0.018f, 0.016f, 0.9f);
+        private static readonly Color PaperColor = new Color(0.90f, 0.86f, 0.72f, 0.86f);
+        private static readonly Color SparkColor = new Color(0.82f, 0.56f, 0.16f, 0.95f);
         private static readonly Color SmokeColor = new Color(0.18f, 0.19f, 0.22f, 0.34f);
 
         private Material runtimeMaterial;
@@ -122,6 +122,64 @@ namespace GTX.Visuals
             }
         }
 
+        public void PlayJumpBurst(Vector3 position, Vector3 forward, float intensity = 1f)
+        {
+            PlayComicPopBurst(position, forward, "POP!", new Color(0.82f, 0.56f, 0.16f, 0.95f), MakeColorAlpha(boostColor, 0.86f), intensity);
+        }
+
+        public void PlayNicePanel(Transform target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            PlayComicPopBurst(target.position - Vector3.up * 0.28f, target.forward, "NICE", MakeColorAlpha(boostColor, 0.96f), new Color(0.50f, 0.62f, 0.64f, 0.95f), 1f);
+        }
+
+        private void PlayComicPopBurst(Vector3 position, Vector3 forward, string text, Color primaryColor, Color accentColor, float intensity)
+        {
+            intensity = Mathf.Clamp01(intensity);
+            Vector3 travel = forward.sqrMagnitude > 0.001f ? forward.normalized : transform.forward;
+            travel.y = 0f;
+            if (travel.sqrMagnitude < 0.001f)
+            {
+                travel = Vector3.forward;
+            }
+
+            travel.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, travel).normalized;
+            Vector3 center = position + Vector3.up * 0.08f;
+
+            SpawnJumpRing(center, travel, right, intensity, accentColor);
+
+            int burstCount = Mathf.RoundToInt(Mathf.Lerp(8f, 14f, intensity));
+            for (int i = 0; i < burstCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / burstCount + Random.Range(-0.16f, 0.16f);
+                Vector3 radial = (right * Mathf.Cos(angle) + travel * Mathf.Sin(angle)).normalized;
+                Vector3 start = center + radial * Random.Range(0.36f, 0.72f) + Vector3.up * Random.Range(0.02f, 0.22f);
+                Vector3 end = start + radial * Random.Range(0.65f, Mathf.Lerp(1.15f, 1.95f, intensity)) + Vector3.up * Random.Range(0.18f, 0.64f);
+                SpawnLine("Runtime Comic Pop Burst Ink", start + Vector3.up * 0.015f, end + Vector3.up * 0.015f, MakeColorAlpha(InkColor, 0.62f), 0.074f, 0f, 0.28f);
+                SpawnLine("Runtime Comic Pop Burst", start, end, i % 3 == 0 ? accentColor : primaryColor, Mathf.Lerp(0.028f, 0.062f, intensity), 0f, 0.32f);
+            }
+
+            int panelCount = Mathf.RoundToInt(Mathf.Lerp(4f, 7f, intensity));
+            for (int i = 0; i < panelCount; i++)
+            {
+                float sideSign = i % 2 == 0 ? -1f : 1f;
+                Vector3 lateral = right * sideSign;
+                Vector3 panelPosition = center + lateral * Random.Range(0.35f, 1.05f) - travel * Random.Range(0.2f, 0.7f) + Vector3.up * Random.Range(0.18f, 0.62f);
+                Quaternion panelRotation = Quaternion.LookRotation((lateral + Vector3.up * 0.25f).normalized, Vector3.up) * Quaternion.Euler(0f, 0f, Random.Range(-18f, 18f));
+                Vector3 panelScale = new Vector3(Random.Range(0.05f, 0.1f), Random.Range(0.03f, 0.06f), Random.Range(0.55f, 1.05f));
+                SpawnPanelSlab("Runtime Comic Pop Panel Ink", panelPosition, panelRotation, panelScale * 1.28f, InkColor, 0.24f, 1.45f);
+                SpawnPanelSlab("Runtime Comic Pop Panel", panelPosition + lateral * 0.018f, panelRotation, panelScale, i % 2 == 0 ? primaryColor : accentColor, 0.22f, 1.55f);
+            }
+
+            SpawnSmokePuffs(center - travel * 0.24f, -travel + Vector3.up * 0.55f, Mathf.Lerp(5f, 9f, intensity), 0.42f);
+            SpawnJumpText(position + Vector3.up * 1.25f + right * 0.55f - travel * 0.35f, travel, text, primaryColor);
+        }
+
         private void SpawnImpactPanels(Vector3 position, Vector3 normal, float intensity)
         {
             Vector3 faceNormal = normal.sqrMagnitude > 0.001f ? normal.normalized : Vector3.up;
@@ -182,6 +240,35 @@ namespace GTX.Visuals
             }
         }
 
+        private void SpawnJumpRing(Vector3 center, Vector3 travel, Vector3 right, float intensity, Color accentColor)
+        {
+            int segments = 10;
+            float radius = Mathf.Lerp(0.68f, 1.12f, intensity);
+            for (int i = 0; i < segments; i++)
+            {
+                float startAngle = i * Mathf.PI * 2f / segments;
+                float endAngle = (i + 0.54f) * Mathf.PI * 2f / segments;
+                Vector3 start = center + (right * Mathf.Cos(startAngle) + travel * Mathf.Sin(startAngle)) * radius;
+                Vector3 end = center + (right * Mathf.Cos(endAngle) + travel * Mathf.Sin(endAngle)) * radius;
+                Color color = i % 2 == 0 ? MakeColorAlpha(InkColor, 0.62f) : MakeColorAlpha(accentColor, 0.9f);
+                SpawnLine("Runtime Jump Ground Ring", start, end, color, Mathf.Lerp(0.04f, 0.075f, intensity), 0f, 0.34f);
+            }
+        }
+
+        private void SpawnJumpText(Vector3 position, Vector3 forward, string textValue, Color color)
+        {
+            TextMesh text = new GameObject("Runtime Comic Pop Text").AddComponent<TextMesh>();
+            text.transform.position = position;
+            text.transform.rotation = Quaternion.LookRotation(Camera.main != null ? Camera.main.transform.forward : forward, Vector3.up) * Quaternion.Euler(0f, 0f, -8f);
+            text.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+            text.text = textValue;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.fontSize = 64;
+            text.color = color;
+            StartCoroutine(ScaleAndFadeText(text, 0.42f, 1.34f));
+        }
+
         private void SpawnSmokePuffs(Vector3 position, Vector3 direction, float count, float lifetime)
         {
             Vector3 drift = direction.sqrMagnitude > 0.001f ? direction.normalized : Vector3.up;
@@ -195,6 +282,46 @@ namespace GTX.Visuals
                 DestroyCollider(puff);
                 ApplyMaterial(puff, SmokeColor);
                 StartCoroutine(DriftScaleAndFade(puff.transform, drift + Random.insideUnitSphere * 0.35f, lifetime * Random.Range(0.85f, 1.35f), Random.Range(1.75f, 2.8f)));
+            }
+        }
+
+        private void SpawnNiceLetter(Transform parent, string letter, Vector3 localPosition, float zRotation, float scale = 0.18f)
+        {
+            TextMesh text = new GameObject("Runtime NICE Letter " + letter).AddComponent<TextMesh>();
+            text.transform.SetParent(parent, false);
+            text.transform.localPosition = localPosition;
+            text.transform.localRotation = Quaternion.Euler(0f, 0f, zRotation);
+            text.transform.localScale = Vector3.one * scale;
+            text.text = letter;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.fontSize = 86;
+            text.color = boostColor;
+        }
+
+        private void SpawnComicBurstLines(Vector3 position, Quaternion rotation)
+        {
+            Vector3 right = rotation * Vector3.right;
+            Vector3 up = rotation * Vector3.up;
+            for (int i = 0; i < 8; i++)
+            {
+                float angle = i * Mathf.PI * 2f / 8f;
+                Vector3 direction = right * Mathf.Cos(angle) + up * Mathf.Sin(angle);
+                Vector3 start = position + direction * 1.65f;
+                Vector3 end = position + direction * 2.35f;
+                SpawnLine("Runtime NICE Burst Line", start, end, i % 2 == 0 ? boostColor : SparkColor, 0.045f, 0f, 0.32f);
+            }
+        }
+
+        private void SpawnComicBurstLines(Transform parent, float startRadius, float endRadius)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                float angle = i * Mathf.PI * 2f / 8f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                Vector3 start = direction * startRadius;
+                Vector3 end = direction * endRadius;
+                SpawnLocalLine(parent, "Runtime NICE Burst Line", start, end, i % 2 == 0 ? boostColor : SparkColor, 0.045f, 0f, 0.32f);
             }
         }
 
@@ -243,6 +370,24 @@ namespace GTX.Visuals
             StartCoroutine(FadeLineAndDestroy(line, color, lifetime));
         }
 
+        private void SpawnLocalLine(Transform parent, string lineName, Vector3 start, Vector3 end, Color color, float startWidth, float endWidth, float lifetime)
+        {
+            GameObject lineObject = new GameObject(lineName);
+            lineObject.transform.SetParent(parent, false);
+            LineRenderer line = lineObject.AddComponent<LineRenderer>();
+            line.useWorldSpace = false;
+            line.positionCount = 2;
+            line.SetPosition(0, start);
+            line.SetPosition(1, end);
+            line.startWidth = startWidth;
+            line.endWidth = endWidth;
+            line.numCapVertices = 2;
+            line.material = GetMaterial(color);
+            line.startColor = color;
+            line.endColor = MakeColorAlpha(color, 0f);
+            StartCoroutine(FadeLineAndDestroy(line, color, lifetime));
+        }
+
         private IEnumerator ScaleAndFade(Transform effect, float lifetime, float scaleMultiplier)
         {
             Vector3 startScale = effect.localScale;
@@ -265,6 +410,70 @@ namespace GTX.Visuals
             if (effect != null)
             {
                 Destroy(effect.gameObject);
+            }
+        }
+
+        private IEnumerator ScaleAndFadeText(TextMesh text, float lifetime, float scaleMultiplier)
+        {
+            if (text == null)
+            {
+                yield break;
+            }
+
+            Transform effect = text.transform;
+            Vector3 startScale = effect.localScale;
+            Color startColor = text.color;
+            float elapsed = 0f;
+            while (text != null && elapsed < lifetime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / lifetime);
+                effect.localScale = Vector3.Lerp(startScale, startScale * scaleMultiplier, t);
+                text.color = MakeColorAlpha(startColor, startColor.a * (1f - t));
+                yield return null;
+            }
+
+            if (text != null)
+            {
+                Destroy(text.gameObject);
+            }
+        }
+
+        private IEnumerator ScaleAndFadeCameraAnchored(Transform anchor, float lifetime, float scaleMultiplier)
+        {
+            if (anchor == null)
+            {
+                yield break;
+            }
+
+            Vector3 startScale = anchor.localScale;
+            Renderer[] renderers = anchor.GetComponentsInChildren<Renderer>(true);
+            Color[] colors = new Color[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                colors[i] = renderers[i] != null ? renderers[i].material.color : Color.white;
+            }
+
+            float elapsed = 0f;
+            while (anchor != null && elapsed < lifetime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / lifetime);
+                anchor.localScale = Vector3.Lerp(startScale, startScale * scaleMultiplier, t);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] != null)
+                    {
+                        renderers[i].material.color = MakeColorAlpha(colors[i], colors[i].a * (1f - t));
+                    }
+                }
+
+                yield return null;
+            }
+
+            if (anchor != null)
+            {
+                Destroy(anchor.gameObject);
             }
         }
 

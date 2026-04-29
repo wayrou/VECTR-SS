@@ -194,6 +194,20 @@ namespace GTX.Progression
                 firstClearBonus = new VectorSSResourceWallet(45, 45, 115),
                 baseXp = 145,
                 hasFirstWinUnlock = false
+            },
+            new VectorSSGarageMapDefinition
+            {
+                id = VectorSSMapId.SpecialStage,
+                displayName = "Special Stage",
+                description = "Wide-open city test course with broad streets, plazas, and buildings to drift around.",
+                lapCount = 3,
+                difficulty = 0.9f,
+                startingUnlocked = true,
+                unlockCost = VectorSSResourceWallet.Zero(),
+                baseReward = new VectorSSResourceWallet(34, 42, 42),
+                firstClearBonus = new VectorSSResourceWallet(40, 50, 50),
+                baseXp = 90,
+                hasFirstWinUnlock = false
             }
         };
 
